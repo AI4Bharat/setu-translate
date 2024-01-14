@@ -1,0 +1,26 @@
+HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
+    --glob_path "/data-3/priyam/translation/wiki/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/data-3/priyam/translation/wiki/cache" \
+    --base_save_path "/data-3/priyam/translation/output/translation/wiki_en/doc_csvs" \
+    --save_path "/data-3/priyam/translation/output/translation/wiki_en/template_wiki_en.csv" \
+    --text_col body \
+    --url_col url \
+    --timestamp_col timestamp \
+    --source_type wiki_en \
+    --translation_type sentence \
+    --use_cache
+
+#    --id_col ID_COL
+
+
+        # data_files=glob.glob("/data-3/priyam/translation/refinedweb-mini/100_000.parquet"),
+        # cache_dir="/data-3/priyam/translation/refinedweb-mini/cache",
+        # rw_templated_filtered.to_csv(f"/data-3/priyam/translation/output/translation/template_{sample_size}.csv")
+
+
+
+python create_global_ds.py \
+    --templated_csv_path "/data-3/priyam/translation/output/translation/wiki_en/template_wiki_en.csv" \
+    --cache_dir "/data-3/priyam/translation/wiki/cache" \
+    --hf_out_csv "/data-3/priyam/translation/output/translation/wiki_en/global_sentences_wiki_en.csv" \
+    --global_sent_ds_path "/data-3/priyam/translation/output/translation/wiki_en/deduped_global_sentences_wiki_en.csv"

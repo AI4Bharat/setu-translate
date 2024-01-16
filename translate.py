@@ -1,128 +1,124 @@
-'''
-Usage:  
-- Do `pip install tritonclient[all] gevent` first.
-- Then use this sample script with the appropriate Triton-server endpoint_url
-'''
+import sys
+import torch
+from transformers import AutoModelForSeq2SeqLM, BitsAndBytesConfig
+from IndicTransTokenizer.utils import preprocess_batch, postprocess_batch
+from IndicTransTokenizer.tokenizer import IndicTransTokenizer
 
-import tritonclient.http as http_client
-from tritonclient.utils import *
-import numpy as np
-from datasets import load_dataset, Dataset
-from functools import partial
-import glob
-import os
-import re
-import pandas as pd
-import csv
-from document import Document
+en_indic_ckpt_dir = "ai4bharat/indictrans2-en-indic-dist-200M"
+BATCH_SIZE = 4
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-class TritonTranslator:
+if len(sys.argv)>1:
+    quantization = sys.argv[1]
+else:
+    quantization = ""
 
-    def __init__(self, endpoint_url='localhost:8000', enable_ssl=False, api_key="__PASTE_KEY_HERE__") -> None:
-        self.endpoint_url = endpoint_url
-        self.enable_ssl = enable_ssl
-        self.http_headers = {"Authorization": f"Bearer {api_key}"}
 
-        # Connect to the server
-        if self.enable_ssl:
-            import gevent.ssl
-            self.triton_http_client = http_client.InferenceServerClient(
-                url=self.endpoint_url, verbose=False,
-                ssl=True, ssl_context_factory=gevent.ssl._create_default_https_context,
-            )
-        else:
-            self.triton_http_client = http_client.InferenceServerClient(
-                url=self.endpoint_url, verbose=False,
-            )
-        # print("Is server ready - {}".format(self.triton_http_client.is_server_ready(headers=self.http_headers)))
-    
-    def get_string_tensor(self, string_values, tensor_name):
-        string_obj = np.array(string_values, dtype="object")
-        input_obj = http_client.InferInput(tensor_name, string_obj.shape, np_to_triton_dtype(string_obj.dtype))
-        input_obj.set_data_from_numpy(string_obj)
-        return input_obj
-
-    def get_translation_input_for_triton(self, texts: list, src_lang: str, tgt_lang: str):
-        return [
-            self.get_string_tensor([[text] for text in texts], "INPUT_TEXT"),
-            self.get_string_tensor([[src_lang]] * len(texts), "INPUT_LANGUAGE_ID"),
-            self.get_string_tensor([[tgt_lang]] * len(texts), "OUTPUT_LANGUAGE_ID"),
-        ]
-
-    def translate(self, input_sentences, src_lang, tgt_lang):
-        inputs = self.get_translation_input_for_triton(input_sentences, src_lang, tgt_lang)
-        output0 = http_client.InferRequestedOutput("OUTPUT_TEXT")
-        response = self.triton_http_client.infer(
-            "nmt",
-            model_version='1',
-            inputs=inputs,
-            outputs=[output0],
-            headers=self.http_headers,
+def initialize_model_and_tokenizer(ckpt_dir, direction, quantization):
+    if quantization == "4-bit":
+        qconfig = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
         )
-        output_batch = response.as_numpy('OUTPUT_TEXT').tolist()
-        return [translation[0].decode("utf-8") for translation in output_batch]
+    elif quantization == "8-bit":
+        qconfig = BitsAndBytesConfig(
+            load_in_8bit=True,
+            bnb_8bit_use_double_quant=True,
+            bnb_8bit_compute_dtype=torch.bfloat16,
+        )
+    else:
+        qconfig = None
 
-def translate(
-    samples,
-    src_lang,
-    tgt_lang,
-):
-    
-    translator = TritonTranslator('0.0.0.0:8000')
-    strs_to_translate = []
-    idx_to_translate = []
-    translated = []
-    
-    for i in range(len(samples["substr"])):
-        translated += [str(None)]
-        if samples["substr"][i] and len(samples["substr"][i].strip()):
-            strs_to_translate += [samples["substr"][i]]
-            idx_to_translate += [i]
-        
-    if not len(strs_to_translate):
-        return samples | {
-            "translated": translated
-        }
-
-    translated_out = translator.translate(strs_to_translate, src_lang, tgt_lang)
-
-    for i, idx in enumerate(idx_to_translate):
-        translated[idx] = translated_out[i]
-
-    return samples | {
-        "translated": translated
-    }
-    
-if __name__ == "__main__":
-
-    sample_size = 100
-
-    sent_ds = load_dataset(
-        "csv",
-        data_files=glob.glob("/data-3/priyam/translation/output/translation/deduped_global_sentences.csv/*"),
-        cache_dir="/data-3/priyam/translation/refinedweb-mini/cache",
-        num_proc=96,
-        split="train"
+    tokenizer = IndicTransTokenizer(direction=direction)
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+        ckpt_dir,
+        trust_remote_code=True,
+        low_cpu_mem_usage=True,
+        quantization_config=qconfig
     )
-
-    sent_ds_translated = sent_ds.map(
-        partial(
-            translate,
-            src_lang="en",
-            tgt_lang="hi",
-        ),
-        batched=True,
-        batch_size=1,
-        num_proc=1
-    )
-
-    sent_ds_translated_filtered = sent_ds_translated.filter(
-        lambda samples: [ True if samples["translated"][i] != str(None) else False for i in range(len(samples["translated"])) ],
-        batched=True,
-        batch_size=256,
-        num_proc=96,
-    )
-
-    sent_ds_translated_filtered.to_csv(f"/data-3/priyam/translation/output/translation/sent_translated_{sample_size}.csv")
-
     
+    if qconfig==None:
+        model = model.to(DEVICE)
+        model.half()
+    
+    model.eval()
+    
+    return tokenizer, model
+
+
+def batch_translate(input_sentences, src_lang, tgt_lang, model, tokenizer):
+    translations = []
+    for i in range(0, len(input_sentences), BATCH_SIZE):
+        batch = input_sentences[i : i + BATCH_SIZE]
+
+        # Preprocess the batch and extract entity mappings
+        batch, entity_map = preprocess_batch(
+            batch, src_lang=src_lang, tgt_lang=tgt_lang
+        )
+
+        # Tokenize the batch and generate input encodings
+        inputs = tokenizer(
+            batch,
+            src=True,
+            truncation=True,
+            padding="longest",
+            return_tensors="pt",
+            return_attention_mask=True,
+        ).to(DEVICE)
+
+        # Generate translations using the model
+        with torch.no_grad():
+            generated_tokens = model.generate(
+                **inputs,
+                use_cache=True,
+                min_length=0,
+                max_length=256,
+                num_beams=5,
+                num_return_sequences=1,
+            )
+
+        # Decode the generated tokens into text
+        generated_tokens = tokenizer.batch_decode(
+            generated_tokens.detach().cpu().tolist(), src=False
+        )
+
+        # Postprocess the translations, including entity replacement
+        translations += postprocess_batch(
+            generated_tokens, lang=tgt_lang, placeholder_entity_map=entity_map
+        )
+
+        del inputs
+        torch.cuda.empty_cache()
+
+    return translations
+
+
+en_indic_tokenizer, en_indic_model = initialize_model_and_tokenizer(
+    en_indic_ckpt_dir, "en-indic", quantization
+)
+
+# ---------------------------------------------------------------------------
+#                              English to Hindi
+# ---------------------------------------------------------------------------
+en_sents = [
+    "When I was young, I used to go to the park every day.",
+    "He has many old books, which he inherited from his ancestors.",
+    "I can't figure out how to solve my problem.",
+    "She is very hardworking and intelligent, which is why she got all the good marks.",
+    "We watched a new movie last week, which was very inspiring.",
+    "If you had met me at that time, we would have gone out to eat.",
+    "She went to the market with her sister to buy a new sari.",
+    "Raj told me that he is going to his grandmother's house next month.",
+    "All the kids were having fun at the party and were eating lots of sweets.",
+    "My friend has invited me to his birthday party, and I will give him a gift.",
+]
+src_lang, tgt_lang = "eng_Latn", "hin_Deva"
+hi_translations = batch_translate(
+    en_sents, src_lang, tgt_lang, en_indic_model, en_indic_tokenizer
+)
+
+print(f"\n{src_lang} - {tgt_lang}")
+for input_sentence, translation in zip(en_sents, hi_translations):
+    print(f"{src_lang}: {input_sentence}")
+    print(f"{tgt_lang}: {translation}")

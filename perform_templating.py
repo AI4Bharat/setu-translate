@@ -11,6 +11,7 @@ import spacy
 import argparse
 import json
 import csv
+from hashlib import sha256
 
 def parse_args():
 
@@ -109,6 +110,19 @@ def parse_args():
         default=None
     )
 
+    parser.add_argument(
+        "--write_to_mini_csvs",
+        action="store_true"
+    )
+
+    parser.add_argument(
+        "--write_style",
+        type=str,
+        required=False,
+        default="doc",
+        choices=["doc", "batch"]
+    )
+
     args = parser.parse_args()
 
     return args
@@ -145,7 +159,6 @@ def remove_non_terminated_chunks(
 
 def perform_templating(
     samples,
-    base_save_path=None,
     add_placeholders=False, 
     sent_tokenization_model=None,
     id_col=None,
@@ -187,27 +200,85 @@ def perform_templating(
 
         for key in doc_schema.keys():
             templated_txts[key][docs_to_template[i]] = doc_dict[key]
-
-        df_save_path = os.path.join(base_save_path, f"{doc_dict['doc_id']}")
-
-        with open(df_save_path, 'w') as csvfile:
-
-            sids = json.loads(doc_dict["sids"])
-            substrs = json.loads(doc_dict["sub_strs"])
-            doc_ids = doc_dict["doc_id"]*len(doc_dict["sids"])
-            rows = list(zip(doc_ids, sids, substrs))
-
-            fields = ["doc_id", "sid", "substr"]
-
-            csvwriter = csv.writer(csvfile)
-            
-            # writing the fields  
-            csvwriter.writerow(fields)
-
-            # writing the data rows  
-            csvwriter.writerows(rows)
         
     return templated_txts
+
+def write_to_batch_lvl_csvs(
+    samples,
+    idx,
+    base_save_path=None,
+):
+    batch_filename = sha256(f"{idx}".encode('utf-8')).hexdigest()
+    df_save_path = os.path.join(base_save_path, batch_filename)
+
+    csv_paths = []
+    start_pos_s = []
+    end_pos_s = []
+
+    with open(df_save_path, 'w') as csvfile:
+
+        csvwriter = csv.writer(csvfile)
+
+        fields = ["doc_id", "sid", "substr"]
+        csvwriter.writerow(fields) # writing the fields  
+
+        start_pos = 1
+
+        for i in range(len(samples["doc_id"])):
+
+            sids = json.loads(samples["sids"][i])
+            substrs = json.loads(samples["sub_strs"][i])
+            doc_ids = samples["doc_id"][i]*len(samples["sids"][i])
+            rows = list(zip(doc_ids, sids, substrs))
+
+            csvwriter.writerows(rows)  # writing the data rows  
+
+            end_pos = start_pos + len(rows)
+        
+            csv_paths += [df_save_path]
+            start_pos_s += [start_pos]
+            end_pos_s += [end_pos]
+
+            start_pos = end_pos
+
+    return samples | {
+        "csv_path": csv_paths,
+        "start_pos": start_pos_s,
+        "end_pos": end_pos_s,
+    }
+
+def write_to_doc_lvl_csvs(
+    samples,
+    idx,
+    base_save_path=None,
+):
+    batch_folder_name = sha256(f"{idx}".encode('utf-8')).hexdigest()
+    batch_folder_path = os.path.join(base_save_path, batch_folder_name)
+    os.makedirs(batch_folder_path, exist_ok=True)
+
+    csv_paths = []
+
+    for i in range(len(samples["doc_id"])):
+
+        sids = json.loads(samples["sids"][i])
+        substrs = json.loads(samples["sub_strs"][i])
+        doc_ids = [samples["doc_id"][i]]*len(samples["sids"][i])
+        rows = list(zip(doc_ids, sids, substrs))
+
+        fields = ["doc_id", "sid", "substr"]
+
+        df_save_path = os.path.join(batch_folder_path, samples["doc_id"][i])
+
+        with open(df_save_path, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(fields) # writing the fields 
+            csvwriter.writerows(rows) # writing the data rows  
+
+        csv_paths += [df_save_path]
+
+    return samples | {
+        "csv_path": csv_paths,
+    }
     
 if __name__ == "__main__":
 
@@ -222,10 +293,13 @@ if __name__ == "__main__":
         data_files=glob.glob(args.glob_path),
         cache_dir=args.cache_dir_for_original_data,
         num_proc=96,
-        split="train") \
+        split="train")
+
+    print(f"Loaded Dataset from path - {args.glob_path}")
     
     if args.sample_size:
         rw = rw.select(range(sample_size))
+        print(f"Sampled dataset of size - {args.sample_size}")
 
     if perform_invalid_terminal_chunk_removal:
         rw = rw.map(
@@ -238,13 +312,13 @@ if __name__ == "__main__":
             num_proc=96,
             load_from_cache_file=args.use_cache,
         )
+        print(f"Performed `terminal punctuation check`")
 
     sent_tokenization_model = spacy.load("en_core_web_md") if use_spacy else None
     os.makedirs(args.base_save_path, exist_ok=True)
     rw_templated = rw.map(
         partial(
             perform_templating,
-            base_save_path=args.base_save_path,
             add_placeholders=args.add_placeholders,
             sent_tokenization_model=sent_tokenization_model,
             id_col=args.id_col,
@@ -260,6 +334,7 @@ if __name__ == "__main__":
         remove_columns=rw.features,
         load_from_cache_file=args.use_cache,
     )
+    print(f"Performed `templating`")
 
     rw_templated_filtered = rw_templated.filter(
         lambda samples: [ True if samples["doc_id"][i] != str(None) else False for i in range(len(samples["doc_id"])) ],
@@ -268,6 +343,35 @@ if __name__ == "__main__":
         num_proc=96,
         load_from_cache_file=args.use_cache,
     )
+    print(f"Filtered `null` text docs")
 
-    rw_templated_filtered.to_csv(args.save_path)
+    if args.write_to_mini_csvs:
+
+        write_style = {
+            "batch": write_to_batch_lvl_csvs,
+            "doc": write_to_doc_lvl_csvs,
+        }
+
+        rw_templated_filtered = rw_templated_filtered.map(
+            partial(
+                write_style[args.write_style],
+                base_save_path=args.base_save_path,
+            ),
+            batched=True,
+            batch_size=256,
+            num_proc=96,
+            load_from_cache_file=args.use_cache,
+            with_indices=True
+        )
+        print(f"Written mini sentence csvs using {args.write_style} style")
+
+        csv_paths = rw_templated_filtered.remove_columns([col for col in rw_templated_filtered.features if col != "csv_path"])
+        csv_paths_file = os.path.join(args.base_save_path, "paths.csv")
+        csv_paths.to_csv(csv_paths_file, num_proc=96)
+        print(f"Saved `paths.csv` to {csv_paths_file}")
+
+    rw_templated_filtered.to_csv(args.save_path, num_proc=96)
+    print(f"Saved `templated` dataset to {args.save_path}")
+    
+
     

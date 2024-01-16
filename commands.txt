@@ -1,14 +1,16 @@
-HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
-    --glob_path "/data-3/priyam/translation/wiki/wiki_en_data.parquet" \
-    --cache_dir_for_original_data "/data-3/priyam/translation/wiki/cache" \
-    --base_save_path "/data-3/priyam/translation/output/translation/wiki_en/doc_csvs" \
-    --save_path "/data-3/priyam/translation/output/translation/wiki_en/template_wiki_en.csv" \
+HF_DATASETS_CACHE=/home/llm/translate/tmp python perform_templating.py \
+    --glob_path "/home/llm/translate/data/wiki_en/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/home/llm/translate/data/wiki_en/cache" \
+    --base_save_path "/home/llm/translate/output/wiki_en/doc_csvs" \
+    --save_path "/home/llm/translate/output/wiki_en/template_wiki_en.csv" \
     --text_col body \
     --url_col url \
     --timestamp_col timestamp \
     --source_type wiki_en \
     --translation_type sentence \
-    --use_cache
+    --use_cache \
+    --write_to_mini_csvs \
+    --write_style "doc"
 
 #    --id_col ID_COL
 
@@ -17,10 +19,37 @@ HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
         # cache_dir="/data-3/priyam/translation/refinedweb-mini/cache",
         # rw_templated_filtered.to_csv(f"/data-3/priyam/translation/output/translation/template_{sample_size}.csv")
 
+HF_DATASETS_CACHE=/home/llm/translate/tmp python translate_dummy.py \
+    --data_glob_path "/home/llm/translate/output/wiki_en/doc_csvs/paths.csv" \
+    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
+    --model_ckpt "ai4bharat/indictrans2-en-indic-dist-200M" \
+    --src_lang "eng_Latn" \
+    --dest_lang "hin_Deva" \
+    --direction "en-indic" \
+    --loader_workers 96 \
+    --model_batch_size 1024 \
+    --prefetch_factor 8 \
+    --csv_batch_size 32 \
+    --devices 0,1,2,3,4,5,6,7
 
+HF_DATASETS_CACHE=/home/llm/translate/tmp python translate_dummy.py \
+    --data_glob_path "/home/llm/translate/output/wiki_en/doc_csvs/paths.csv" \
+    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
+    --model_ckpt "ai4bharat/indictrans2-en-indic-dist-200M" \
+    --src_lang "eng_Latn" \
+    --dest_lang "hin_Deva" \
+    --direction "en-indic" \
+    --loader_workers 96 \
+    --model_batch_size 1024 \
+    --prefetch_factor 8 \
+    --csv_batch_size 32 \
+    --devices 0
 
 python create_global_ds.py \
-    --templated_csv_path "/data-3/priyam/translation/output/translation/wiki_en/template_wiki_en.csv" \
-    --cache_dir "/data-3/priyam/translation/wiki/cache" \
-    --hf_out_csv "/data-3/priyam/translation/output/translation/wiki_en/global_sentences_wiki_en.csv" \
-    --global_sent_ds_path "/data-3/priyam/translation/output/translation/wiki_en/deduped_global_sentences_wiki_en.csv"
+    --paths_data "/home/llm/translate/output/wiki_en/doc_csvs/paths.csv" \
+    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
+    --global_sent_ds_path "/home/llm/translate/output/wiki_en/global_sentences_wiki_en.csv"
+
+
+
+docker run --shm-size=2048m --gpus=\"device=0,1,2,3,4,5,6,7\" --rm -v ${PWD}/../checkpoints/:/models/checkpoints -p 8000:8000 -t indictrans2_triton

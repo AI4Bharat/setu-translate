@@ -106,7 +106,7 @@ def send_request(texts, src_lang, tgt_lang, server_url="http://0.0.0.0:8000/v2/m
         error = f"Exception: {exception_info}\nTraceback:\n{traceback_info}" # Combine exception information and traceback
         return None, error, "response_json"
 
-    translated_txt = output_data['outputs'][0]['data'][0]
+    translated_txt = output_data['outputs'][0]['data']
     return translated_txt, None, None
 
 def translate(
@@ -172,13 +172,12 @@ if __name__ == "__main__":
             num_proc=128,
             split=split
         )
-        # ds.set_transform(convert_str2list)
         print(f"Loaded Dataset from {data_file} and resume-idx `{resume_idx}`")
 
         data_loader = DataLoader(
             ds,
             num_workers=1, 
-            batch_size=256,
+            batch_size=512,
             prefetch_factor=8,
             shuffle=False
         )
@@ -193,20 +192,9 @@ if __name__ == "__main__":
         )
 
         idx_logging = resume_idx if resume_idx else 0
+        original_columns = ['source', 'url', 'timestamp', 'doc_id', 'text', 'sub_strs', 'sids', 'csv_path']
         run_df = pd.DataFrame(
-            columns=[
-                'source', 
-                'url', 
-                'timestamp', 
-                'doc_id', 
-                'text', 
-                'sub_strs', 
-                'sids', 
-                'csv_path', 
-                'translated', 
-                'completed', 
-                'reason'
-            ]
+            columns = original_columns + [ 'translated', 'completed', 'reason' ],
         )
         for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit="batch", total=len(data_loader)):
             batch_status = Parallel(
@@ -223,7 +211,7 @@ if __name__ == "__main__":
             idx_logging += len(batch["doc_id"])
 
             batch_info_mapping = {}
-            for key in run_df.columns:
+            for key in original_columns:
                 batch_info_mapping[key] = batch[key]
             batch_info_mapping["translated"] = [json.dumps(translated) for translated, _, _ in batch_status]
             batch_info_mapping["completed"] = [completed for _, completed, _ in batch_status]

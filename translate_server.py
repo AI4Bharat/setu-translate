@@ -101,8 +101,6 @@ def translate(
     for i, idx in enumerate(idx_to_translate):
         translated[idx] = translated_out[i]
 
-    
-
     return samples | {
         "translated": translated
     }

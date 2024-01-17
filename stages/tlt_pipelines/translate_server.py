@@ -14,7 +14,7 @@ import os
 import re
 import pandas as pd
 import csv
-from document import Document
+from .document import Document
 import argparse
 import json
 import os

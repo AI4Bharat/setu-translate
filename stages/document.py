@@ -179,7 +179,6 @@ class Document:
             "url": [str(None)], 
             "timestamp": [str(None)], 
             "text": [str(None)], 
-            # "templated_text": [str(None)], 
             "sub_strs": [str(None)], 
             "sids": [str(None)]
         }
@@ -203,7 +202,6 @@ class Document:
             "url": self.url,
             "timestamp": timestamp,
             "text": self.text,
-            # "templated_text": self.templated_text,
             "sub_strs": json.dumps(df["text"].tolist()),
             "sids": json.dumps(df["hash_id"].tolist()),
         }

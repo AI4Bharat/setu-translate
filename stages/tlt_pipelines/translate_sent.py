@@ -1,21 +1,15 @@
-'''
-Usage:  
-- Do `pip install tritonclient[all] gevent` first.
-- Then use this sample script with the appropriate Triton-server endpoint_url
-'''
-
 import numpy as np
 import torch
-from datasets import load_dataset
-from torch.utils.data import Dataset, DataLoader
+from datasets import load_dataset, Dataset, concatenate_datasets
+from torch.utils.data import DataLoader
 from functools import partial
 import glob
 import os
 import re
 import pandas as pd
 import csv
-from document import Document
-import argparse
+from .document import Document
+import argparses
 import json
 import os
 import multiprocessing as mp
@@ -30,24 +24,30 @@ import traceback
 def cleanup(
     idx_logging,
     resume_log_file_path,
-    run_df,
+    run_ds,
     run_dir
 ):
     with open(resume_log_file_path, "a+") as resume_f:
         resume_f.write(f'Saving latest resume-index: <{idx_logging}> at - {datetime.now().strftime("%m/%d/%Y, %H:%M:%S")}\n')
     print(f"Saved `resume_idx` to {resume_log_file_path}....")
 
-    run_df_save_path = os.path.join(run_dir, datetime.now().strftime("%m_%d_%Y-%H:%M:%S"))
-    run_df.to_csv(run_df_save_path)
-    print(f"Saved latest `run_df` to {run_df_save_path}....")
+    run_ds_save_path = os.path.join(run_dir, datetime.now().strftime("%m_%d_%Y-%H:%M:%S"))
+    run_ds.to_csv(
+        run_ds_save_path,
+        num_proc=128,
+    )
+    print(f"Saved latest `run_ds` to {run_ds_save_path}....")
     
     print("Performed clean-up!")
 
 def extract_resume_idx(text):
+
     # Regular expression to find text between < and >
     pattern = re.compile(r'<(.*?)>')
+
     # Find all occurrences of the pattern
     matches = pattern.findall(text)
+
     return matches
 
 def send_request(texts, src_lang, tgt_lang, server_url="http://0.0.0.0:8000/v2/models/nmt/infer", auth_key=None):
@@ -133,22 +133,9 @@ def translate(
             error_f.write(error)
         return None, False, "main"
 
-def convert_str2list(batch):
-
-    keys = ['source', 'url', 'timestamp', 'doc_id', 'text', 'csv_path']
-    keys_json = ['sub_strs', 'sids']
-    batch_out = {key:[] for key in keys + keys_json}
-    for i in range(len(batch["doc_id"])):
-        for key in keys:
-            batch_out[key] += [batch[key][i]]
-        for key in keys_json:
-            batch_out[key] += [json.loads(batch[key][i])]
-    return batch_out
-
 if __name__ == "__main__":
 
     try:
-
         print("Program is running. Press Ctrl+C to interrupt.")
 
         resume_idx=None
@@ -177,7 +164,7 @@ if __name__ == "__main__":
         data_loader = DataLoader(
             ds,
             num_workers=1, 
-            batch_size=512,
+            batch_size=4096,
             prefetch_factor=8,
             shuffle=False
         )
@@ -193,16 +180,16 @@ if __name__ == "__main__":
 
         idx_logging = resume_idx if resume_idx else 0
         original_columns = ['source', 'url', 'timestamp', 'doc_id', 'text', 'sub_strs', 'sids', 'csv_path']
-        run_df = pd.DataFrame(
-            columns = original_columns + [ 'translated', 'completed', 'reason' ],
+        run_ds = Dataset.from_dict(
+            { key: [] for key in original_columns + [ 'translated', 'completed', 'reason' ] },
         )
-        for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit="batch", total=len(data_loader)):
+        for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit=f"ba: {4096} samples/ba", total=len(data_loader)):
             batch_status = Parallel(
-                n_jobs=128,
-                backend="threading",
-                verbose=0,
+                n_jobs=4096,
+                verbose=0, 
+                prefer="processes",
                 batch_size="auto",
-                pre_dispatch='2*n_jobs',
+                pre_dispatch='n_jobs',
                 temp_folder="/home/llm/translate/tmp"
             )(
                 delayed(tlt_func)(substr) for substr in list(zip(batch["sub_strs"], batch["csv_path"]))
@@ -210,19 +197,15 @@ if __name__ == "__main__":
 
             idx_logging += len(batch["doc_id"])
 
-            batch_info_mapping = {}
-            for key in original_columns:
-                batch_info_mapping[key] = batch[key]
+            batch_info_mapping = { key: batch[key] for key in original_columns }
             batch_info_mapping["translated"] = [json.dumps(translated) for translated, _, _ in batch_status]
             batch_info_mapping["completed"] = [completed for _, completed, _ in batch_status]
             batch_info_mapping["reason"] = [reason for _, _, reason in batch_status]
-
-            run_df = pd.concat(
+            run_ds = concatenate_datasets(
                 [
-                    run_df,
-                    pd.DataFrame(batch_info_mapping)
-                ], 
-                ignore_index=True
+                    run_ds, 
+                    Dataset.from_dict(batch_info_mapping),
+                ]
             )
 
     except KeyboardInterrupt:
@@ -232,7 +215,7 @@ if __name__ == "__main__":
         cleanup(
             idx_logging=idx_logging,
             resume_log_file_path=resume_log_file_path,
-            run_df=run_df,
+            run_ds=run_ds,
             run_dir=run_dir,
         )
 

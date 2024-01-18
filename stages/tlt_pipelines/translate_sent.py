@@ -8,8 +8,8 @@ import os
 import re
 import pandas as pd
 import csv
-from .document import Document
-import argparses
+from document import Document
+import argparse
 import json
 import os
 import multiprocessing as mp
@@ -138,12 +138,15 @@ if __name__ == "__main__":
     try:
         print("Program is running. Press Ctrl+C to interrupt.")
 
+        root_dir = "/data-3/priyam/translation/output"
+
         resume_idx=None
-        resume_log_file_path="/home/llm/translate/output/wiki_en/resume_idx_sent_lvl_log"
-        run_dir="/home/llm/translate/output/wiki_en/run_sent_lvl"
+        resume_log_file_path=f"{root_dir}/wiki_en/resume_idx_sent_lvl_log"
+        run_dir=f"{root_dir}/wiki_en/run_sent_lvl"
         filetype="csv"
-        data_file="/home/llm/translate/output/wiki_en/template_wiki_en.csv"
-        cache_dir="/home/llm/translate/data/wiki_en/cache"
+        data_file=f"{root_dir}/wiki_en/template_wiki_en.csv"
+        cache_dir="/data-3/priyam/translation/data/wiki_en/cache"
+        joblib_temp_folder=f"{root_dir}/tmp"
 
         if os.path.isfile(resume_log_file_path):
             with open(resume_log_file_path, "r") as resume_f:
@@ -164,7 +167,7 @@ if __name__ == "__main__":
         data_loader = DataLoader(
             ds,
             num_workers=1, 
-            batch_size=4096,
+            batch_size=1024,
             prefetch_factor=8,
             shuffle=False
         )
@@ -183,14 +186,14 @@ if __name__ == "__main__":
         run_ds = Dataset.from_dict(
             { key: [] for key in original_columns + [ 'translated', 'completed', 'reason' ] },
         )
-        for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit=f"ba: {4096} samples/ba", total=len(data_loader)):
+        for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit=f"ba: {1024} samples/ba", total=len(data_loader)):
             batch_status = Parallel(
-                n_jobs=4096,
+                n_jobs=512,
                 verbose=0, 
-                prefer="processes",
+                prefer="threads",
                 batch_size="auto",
-                pre_dispatch='n_jobs',
-                temp_folder="/home/llm/translate/tmp"
+                pre_dispatch='2*n_jobs',
+                temp_folder=joblib_temp_folder,
             )(
                 delayed(tlt_func)(substr) for substr in list(zip(batch["sub_strs"], batch["csv_path"]))
             )

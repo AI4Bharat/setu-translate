@@ -1,8 +1,8 @@
-HF_DATASETS_CACHE=/home/llm/translate/tmp python perform_templating.py \
-    --glob_path "/home/llm/translate/data/wiki_en/wiki_en_data.parquet" \
-    --cache_dir_for_original_data "/home/llm/translate/data/wiki_en/cache" \
-    --base_save_path "/home/llm/translate/output/wiki_en/doc_csvs" \
-    --save_path "/home/llm/translate/output/wiki_en/template_wiki_en.csv" \
+HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
+    --glob_path "/data-3/priyam/translation/data/wiki_en/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/data-3/priyam/translation/data/wiki_en/cache" \
+    --base_save_path "/data-3/priyam/translation/output/wiki_en/doc_csvs" \
+    --save_path "/data-3/priyam/translation/output/wiki_en/template_wiki_en.csv" \
     --text_col body \
     --url_col url \
     --timestamp_col timestamp \
@@ -50,6 +50,9 @@ python create_global_ds.py \
     --cache_dir "/home/llm/translate/data/wiki_en/cache" \
     --global_sent_ds_path "/home/llm/translate/output/wiki_en/global_sentences_wiki_en.csv"
 
-
+python create_global_ds.py \
+    --paths_data "/data-3/priyam/translation/output/wiki_en/doc_csvs/paths.csv" \
+    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
+    --global_sent_ds_path "/data-3/priyam/translation/output/wiki_en/global_sentences_wiki_en.csv"
 
 docker run --shm-size=2048m --gpus=\"device=0,1,2,3,4,5,6,7\" --rm -v ${PWD}/../checkpoints/:/models/checkpoints -p 8000:8000 -t indictrans2_triton

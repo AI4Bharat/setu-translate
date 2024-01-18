@@ -8,7 +8,7 @@ import os
 import re
 import pandas as pd
 import csv
-from .document import Document
+from document import Document
 import argparse
 import json
 import os
@@ -24,19 +24,19 @@ import traceback
 def cleanup(
     idx_logging,
     resume_log_file_path,
-    status_ds,
-    status_dir
+    run_ds,
+    run_dir
 ):
     with open(resume_log_file_path, "a+") as resume_f:
         resume_f.write(f'Saving latest resume-index: <{idx_logging}> at - {datetime.now().strftime("%m/%d/%Y, %H:%M:%S")}\n')
     print(f"Saved `resume_idx` to {resume_log_file_path}....")
 
-    status_ds_save_path = os.path.join(status_dir, datetime.now().strftime("%m_%d_%Y-%H:%M:%S"))
-    status_ds.to_csv(
-        status_ds_save_path, 
+    run_ds_save_path = os.path.join(run_dir, datetime.now().strftime("%m_%d_%Y-%H:%M:%S"))
+    run_ds.to_csv(
+        run_ds_save_path, 
         num_proc=128
     )
-    print(f"Saved latest `status_ds` to {status_ds_save_path}....")
+    print(f"Saved latest `run_ds` to {run_ds_save_path}....")
     
     print("Performed clean-up!")
 
@@ -142,12 +142,15 @@ if __name__ == "__main__":
     try:
         print("Program is running. Press Ctrl+C to interrupt.")
 
+        root_dir = "/data-3/priyam/translation/output"
+
         resume_idx=None
-        resume_log_file_path="/home/llm/translate/output/wiki_en/resume_idx_csv_lvl_log"
-        run_dir="/home/llm/translate/output/wiki_en/run_csv_lvl"
+        resume_log_file_path=f"{root_dir}/wiki_en/resume_idx_csv_lvl_log"
+        run_dir=f"{root_dir}/wiki_en/run_csv_lvl"
         filetype="csv"
-        data_file="/home/llm/translate/output/wiki_en/doc_csvs/paths.csv"
-        cache_dir="/home/llm/translate/data/wiki_en/cache"
+        data_file=f"{root_dir}/wiki_en/doc_csvs/paths.csv"
+        cache_dir="/data-3/priyam/translation/data/wiki_en/cache"
+        joblib_temp_folder=f"{root_dir}/tmp"
 
         if os.path.isfile(resume_log_file_path):
             with open(resume_log_file_path, "r") as resume_f:
@@ -168,7 +171,7 @@ if __name__ == "__main__":
         data_loader = DataLoader(
             ds,
             num_workers=1, 
-            batch_size=4096,
+            batch_size=512,
             prefetch_factor=8,
             shuffle=False
         )
@@ -187,21 +190,21 @@ if __name__ == "__main__":
         run_ds = Dataset.from_dict(
             { key: [] for key in original_columns },
         )
-        for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit=f"ba: {4096} samples/ba", total=len(data_loader)):
+        for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit=f"ba: {512} samples/ba", total=len(data_loader)):
             batch_status = Parallel(
-                n_jobs=4096,
+                n_jobs=96,
                 verbose=0, 
                 prefer="processes",
                 batch_size="auto",
                 pre_dispatch='n_jobs',
-                temp_folder="/home/llm/translate/tmp"
+                temp_folder=joblib_temp_folder,
             )(
-                delayed(tlt_func)(path) for path in batch["path"]
+                delayed(tlt_func)(path) for path in batch["csv_path"]
             )
-            idx_logging += len(batch["path"])
+            idx_logging += len(batch["csv_path"])
 
             batch_info_mapping = {
-                "path": batch["path"],
+                "path": batch["csv_path"],
                 "completed": [completed for completed, _ in batch_status],
                 "reason": [reason for _, reason in batch_status],
             }
@@ -209,7 +212,7 @@ if __name__ == "__main__":
             run_ds = concatenate_datasets(
                 [
                     run_ds, 
-                    Dataset.DataFrame(batch_info_mapping),
+                    Dataset.from_dict(batch_info_mapping),
                 ], 
             )
         
@@ -221,8 +224,8 @@ if __name__ == "__main__":
         cleanup(
             idx_logging=idx_logging,
             resume_log_file_path=resume_log_file_path,
-            status_ds=status_ds,
-            status_dir=resume_status_dir,
+            run_ds=run_ds,
+            run_dir=run_dir,
         )
 
         sys.exit(0)

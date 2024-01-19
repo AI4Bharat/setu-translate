@@ -73,6 +73,12 @@ def parse_args():
         "--source_type",
         type=str,
         required=True,
+    )
+
+    parser.add_argument(
+        "--split",
+        type=str,
+        required=True,
     )   
 
     parser.add_argument(
@@ -292,8 +298,9 @@ if __name__ == "__main__":
         "parquet",
         data_files=glob.glob(args.glob_path),
         cache_dir=args.cache_dir_for_original_data,
-        num_proc=96,
-        split="train")
+        num_proc=64,
+        split=args.split
+    )
 
     print(f"Loaded Dataset from path - {args.glob_path}")
     
@@ -309,7 +316,7 @@ if __name__ == "__main__":
             ),
             batched=True,
             batch_size=256,
-            num_proc=96,
+            num_proc=64,
             load_from_cache_file=args.use_cache,
         )
         print(f"Performed `terminal punctuation check`")
@@ -330,7 +337,7 @@ if __name__ == "__main__":
         ),
         batched=True,
         batch_size=256,
-        num_proc=96,
+        num_proc=64,
         remove_columns=rw.features,
         load_from_cache_file=args.use_cache,
     )
@@ -340,7 +347,7 @@ if __name__ == "__main__":
         lambda samples: [ True if samples["doc_id"][i] != str(None) else False for i in range(len(samples["doc_id"])) ],
         batched=True,
         batch_size=256,
-        num_proc=96,
+        num_proc=64,
         load_from_cache_file=args.use_cache,
     )
     print(f"Filtered `null` text docs")
@@ -359,7 +366,7 @@ if __name__ == "__main__":
             ),
             batched=True,
             batch_size=256,
-            num_proc=96,
+            num_proc=64,
             load_from_cache_file=args.use_cache,
             with_indices=True
         )
@@ -370,7 +377,7 @@ if __name__ == "__main__":
         csv_paths.to_csv(csv_paths_file, num_proc=96)
         print(f"Saved `paths.csv` to {csv_paths_file}")
 
-    rw_templated_filtered.to_csv(args.save_path, num_proc=96)
+    rw_templated_filtered.save_to_disk(args.save_path, num_proc=96)
     print(f"Saved `templated` dataset to {args.save_path}")
     
 

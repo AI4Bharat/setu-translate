@@ -206,7 +206,7 @@ if __name__ == "__main__":
             batch_info_mapping["reason"] = [reason for _, _, reason in batch_status]
             run_ds = concatenate_datasets(
                 [
-                    run_ds, 
+                    run_ds,
                     Dataset.from_dict(batch_info_mapping),
                 ]
             )

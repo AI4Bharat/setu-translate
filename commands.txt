@@ -1,8 +1,8 @@
-HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
-    --glob_path "/data-3/priyam/translation/data/wiki_en/wiki_en_data.parquet" \
-    --cache_dir_for_original_data "/data-3/priyam/translation/data/wiki_en/cache" \
-    --base_save_path "/data-3/priyam/translation/output/wiki_en/doc_csvs" \
-    --save_path "/data-3/priyam/translation/output/wiki_en/template_wiki_en.csv" \
+HF_DATASETS_CACHE=/mnt/data/tmp python perform_templating.py \
+    --glob_path "/mnt/data/translation/data/wiki_en/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/mnt/data/translation/data/wiki_en/cache" \
+    --base_save_path "/mnt/data/translation/output/wiki_en/doc_csvs" \
+    --save_path "/mnt/data/translation/output/wiki_en/template_wiki_en.csv" \
     --text_col body \
     --url_col url \
     --timestamp_col timestamp \
@@ -10,7 +10,21 @@ HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
     --translation_type sentence \
     --use_cache \
     --write_to_mini_csvs \
-    --write_style "doc"
+    --write_style "doc" \
+    --split "train[:5%]"
+
+HF_DATASETS_CACHE=/mnt/data/tmp python perform_templating.py \
+    --glob_path "/mnt/data/translation/data/wiki_en/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/mnt/data/translation/data/wiki_en/cache" \
+    --base_save_path "/mnt/data/translation/output/wiki_en/doc_csvs" \
+    --save_path "/mnt/data/translation/output/wiki_en/templated" \
+    --text_col body \
+    --url_col url \
+    --timestamp_col timestamp \
+    --source_type wiki_en \
+    --translation_type sentence \
+    --use_cache \
+    --split "train[:5%]"
 
 #    --id_col ID_COL
 
@@ -51,8 +65,8 @@ python create_global_ds.py \
     --global_sent_ds_path "/home/llm/translate/output/wiki_en/global_sentences_wiki_en.csv"
 
 python create_global_ds.py \
-    --paths_data "/data-3/priyam/translation/output/wiki_en/doc_csvs/paths.csv" \
-    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-    --global_sent_ds_path "/data-3/priyam/translation/output/wiki_en/global_sentences_wiki_en.csv"
+    --paths_data "/mnt/data/translation/output/wiki_en/templated/*.arrow" \
+    --cache_dir "/mnt/data/translation/data/wiki_en/cache" \
+    --global_sent_ds_path "/mnt/data/translation/output/wiki_en/sentences"
 
 docker run --shm-size=2048m --gpus=\"device=0,1,2,3,4,5,6,7\" --rm -v ${PWD}/../checkpoints/:/models/checkpoints -p 8000:8000 -t indictrans2_triton

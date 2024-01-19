@@ -2,6 +2,7 @@ from datasets import load_dataset
 import glob
 import pandas as pd
 import argparse
+import json
 
 def parse_args():
 
@@ -29,22 +30,32 @@ def parse_args():
 
     return args
 
-def read_csvs(
+def flatten_substr(
     samples,
-    keys=["doc_id", "sid", "substr"],
+    keys=["doc_id", "sids", "sub_strs"],
 ):
     out = {key: [] for key in keys}
-    for i in range(len(samples["csv_path"])):
-        df = pd.read_csv(samples["csv_path"][i])
-        df = df.dropna(subset=["substr"])
-        df = df[df.apply(lambda row: False if not isinstance(row["substr"], str) or not len(row["substr"].strip()) else True, axis=1)]
-        df_dict = df.to_dict('list')
-        try:
-            for key in out.keys():
-                out[key] += df_dict[key]
-        except Exception as e:
-            print(f"Failed for path: {samples['csv_path'][i]}")
-            print(str(e))
+    for i in range(len(samples["doc_id"])):
+
+        if not samples["sub_strs"][i] or not len(samples["sub_strs"][i]):
+            continue
+
+        sids = json.loads(samples["sids"][i])
+        sub_strs = json.loads(samples["sub_strs"][i])
+
+        substr_idx = []
+
+        for idx, substr in enumerate(sub_strs):
+            if not isinstance(substr, str) or not len(substr.strip()):
+                continue
+            substr_idx += [idx]
+        
+        out["doc_id"] += [samples["doc_id"][i]] * len(substr_idx)
+
+        for key, value in [("sids", sids), ("sub_strs", sub_strs)]:
+            for idx in substr_idx:
+                out[key] += [value[idx]]
+
     return out
     
 if __name__ == "__main__":
@@ -52,20 +63,31 @@ if __name__ == "__main__":
     args = parse_args()
 
     paths_ds = load_dataset(
-        "csv",
+        "arrow",
         data_files=[args.paths_data],
         cache_dir=args.cache_dir,
-        num_proc=128,
+        num_proc=64,
         split="train"
     )
 
     sentence_ds = paths_ds.map(
-        read_csvs,
+        flatten_substr,
         batched=True,
         batch_size=256,
-        num_proc=128,
-        remove_columns=paths_ds.features
+        num_proc=64,
+        remove_columns=paths_ds.features,
     )
 
-    sentence_ds.to_csv(args.global_sent_ds_path)
+    sentence_ds = sentence_ds.map(
+        lambda samples, idx: samples | { "ttl_idx": idx },
+        batched=True,
+        batch_size=256,
+        num_proc=64,
+        with_indices=True
+    )
+
+    sentence_ds.save_to_disk(
+        args.global_sent_ds_path,
+        num_proc=64,
+    )
 

@@ -40,8 +40,8 @@ def padding_collator(
 
         len_list = list(map(lambda x: len(x), batch_out[key]))
 
-        # padding_length = max(len_list)
-        padding_length = 256
+        padding_length = max(len_list)
+        # padding_length = 256
         tensor_list = []
         for i, x in enumerate(batch_out[key]):
 
@@ -132,7 +132,7 @@ def _mp_fn(
 
 if __name__ == "__main__":
 
-    root_dir = "/mnt/data/translation"
+    root_dir = "/data-3/priyam/translation"
     data_files=f"{root_dir}/output/wiki_en/binarized_sentences"
     cache_dir=f"{root_dir}/data/wiki_en/cache"
     base_save_dir=f"{root_dir}/data/wiki_en/model_out"

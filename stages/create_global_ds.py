@@ -79,7 +79,7 @@ if __name__ == "__main__":
     )
 
     sentence_ds = sentence_ds.map(
-        lambda samples, idx: samples | { "ttl_idx": idx },
+        lambda samples, idx: samples | { "tlt_idx": idx },
         batched=True,
         batch_size=256,
         num_proc=64,

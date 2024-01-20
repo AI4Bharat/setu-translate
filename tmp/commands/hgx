@@ -1,0 +1,42 @@
+
+
+
+HF_DATASETS_CACHE=/home/llm/tmp python perform_templating.py \
+    --glob_path "/home/llm/translate/data/wiki_en/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/home/llm/translate/data/wiki_en/cache" \
+    --base_save_path "/home/llm/translate/output/wiki_en/doc_csvs" \
+    --save_path "/home/llm/translate/output/wiki_en/templated" \
+    --text_col body \
+    --url_col url \
+    --timestamp_col timestamp \
+    --source_type wiki_en \
+    --translation_type sentence \
+    --use_cache False \
+    --split "train[:5%]"
+
+HF_DATASETS_CACHE=/home/llm/tmp python create_global_ds.py \
+    --paths_data "/home/llm/translate/output/wiki_en/templated/*.arrow" \
+    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
+    --global_sent_ds_path "/home/llm/translate/output/wiki_en/sentences"
+
+HF_DATASETS_CACHE=/home/llm/tmp python binarize.py \
+    --root_dir "/home/llm/translate" \
+    --data_files "/home/llm/translate/output/wiki_en/sentences/*.arrow" \
+    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
+    --binarized_dir "/home/llm/translate/output/wiki_en/binarized_sentences" \
+    --joblib_temp_folder "/home/llm/translate/tmp" \
+    --batch_size 2048 \
+    --total_procs 64 \
+    --run_joblib False \
+    --src_lang eng_Latn \
+    --tgt_lang hin_Deva
+
+HF_DATASETS_CACHE=/home/llm/tmp python tlt_pipelines/translate_joblib.py \
+    --root_dir "/home/llm/translate" \
+    --data_files "/home/llm/translate/output/wiki_en/binarized_sentences/*.arrow" \
+    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
+    --base_save_dir "/home/llm/translate/output/wiki_en/model_out" \
+    --joblib_temp_folder "/home/llm/translate/tmp" \
+    --batch_size 512 \
+    --total_procs 64 \
+    --devices "0,1"

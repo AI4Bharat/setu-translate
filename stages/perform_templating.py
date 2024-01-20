@@ -13,6 +13,14 @@ import json
 import csv
 from hashlib import sha256
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def parse_args():
 
     parser = argparse.ArgumentParser(description="Performs templating on the entire dataset and extract strings")
@@ -91,22 +99,26 @@ def parse_args():
 
     parser.add_argument(
         "--use_cache",
-        action="store_true"
+        type=str2bool,
+        default=False,
     )
 
     parser.add_argument(
         "--filter_invalid_terminal",
-        action="store_true"
+        type=str2bool,
+        default=False,
     )
 
     parser.add_argument(
         "--use_spacy",
-        action="store_true"
+        type=str2bool,
+        default=False,
     )
 
     parser.add_argument(
         "--add_placeholders",
-        action="store_true"
+        type=str2bool,
+        default=False,
     )
 
     parser.add_argument(
@@ -118,7 +130,8 @@ def parse_args():
 
     parser.add_argument(
         "--write_to_mini_csvs",
-        action="store_true"
+        type=str2bool,
+        default=False,
     )
 
     parser.add_argument(
@@ -374,10 +387,10 @@ if __name__ == "__main__":
 
         csv_paths = rw_templated_filtered.remove_columns([col for col in rw_templated_filtered.features if col != "csv_path"])
         csv_paths_file = os.path.join(args.base_save_path, "paths.csv")
-        csv_paths.to_csv(csv_paths_file, num_proc=96)
+        csv_paths.to_csv(csv_paths_file, num_proc=64)
         print(f"Saved `paths.csv` to {csv_paths_file}")
 
-    rw_templated_filtered.save_to_disk(args.save_path, num_proc=96)
+    rw_templated_filtered.save_to_disk(args.save_path, num_proc=64)
     print(f"Saved `templated` dataset to {args.save_path}")
     
 

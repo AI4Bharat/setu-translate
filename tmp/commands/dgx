@@ -1,41 +1,53 @@
 #!/usr/bin/bash
 
-# HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
-#     --glob_path "/data-3/priyam/translation/data/wiki_en/wiki_en_data.parquet" \
-#     --cache_dir_for_original_data "/data-3/priyam/translation/data/wiki_en/cache" \
-#     --base_save_path "/data-3/priyam/translation/output/wiki_en/doc_csvs" \
-#     --save_path "/data-3/priyam/translation/output/wiki_en/templated" \
-#     --text_col body \
-#     --url_col url \
-#     --timestamp_col timestamp \
-#     --source_type wiki_en \
-#     --translation_type sentence \
-#     --use_cache False \
-#     --split "train"
+HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
+    --glob_path "/data-3/priyam/translation/data/wiki_en/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/data-3/priyam/translation/data/wiki_en/cache" \
+    --base_save_path "/data-3/priyam/translation/output/wiki_en/doc_csvs" \
+    --save_path "/data-3/priyam/translation/output/wiki_en/templated_1000" \
+    --text_col body \
+    --url_col url \
+    --timestamp_col timestamp \
+    --source_type wiki_en \
+    --translation_type sentence \
+    --use_cache False \
+    --split "train[:1000]"
 
-# HF_DATASETS_CACHE=/data-3/priyam/tmp python create_global_ds.py \
-#     --paths_data "/data-3/priyam/translation/output/wiki_en/templated/*.arrow" \
-#     --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-#     --global_sent_ds_path "/data-3/priyam/translation/output/wiki_en/sentences"
+HF_DATASETS_CACHE=/data-3/priyam/tmp python create_global_ds.py \
+    --paths_data "/data-3/priyam/translation/output/wiki_en/templated_1000/*.arrow" \
+    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
+    --global_sent_ds_path "/data-3/priyam/translation/output/wiki_en/sentences_1000"
 
-# HF_DATASETS_CACHE=/data-3/priyam/tmp python binarize.py \
-#     --root_dir "/data-3/priyam/translation" \
-#     --data_files "/data-3/priyam/translation/output/wiki_en/sentences/*.arrow" \
-#     --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-#     --binarized_dir "/data-3/priyam/translation/output/wiki_en/binarized_sentences" \
-#     --joblib_temp_folder "/data-3/priyam/translation/tmp" \
-#     --batch_size 2048 \
-#     --total_procs 64 \
-#     --run_joblib False \
-#     --src_lang eng_Latn \
-#     --tgt_lang hin_Deva
+HF_DATASETS_CACHE=/data-3/priyam/tmp python binarize.py \
+    --root_dir "/data-3/priyam/translation" \
+    --data_files "/data-3/priyam/translation/output/wiki_en/sentences_1000/*.arrow" \
+    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
+    --binarized_dir "/data-3/priyam/translation/output/wiki_en/binarized_sentences_1000" \
+    --joblib_temp_folder "/data-3/priyam/translation/tmp" \
+    --batch_size 512 \
+    --total_procs 64 \
+    --run_joblib False \
+    --src_lang eng_Latn \
+    --tgt_lang hin_Deva
 
 HF_DATASETS_CACHE=/data-3/priyam/tmp python tlt_pipelines/translate_joblib.py \
     --root_dir "/data-3/priyam/translation" \
-    --data_files "/data-3/priyam/translation/output/wiki_en/binarized_sentences/*.arrow" \
+    --data_files "/data-3/priyam/translation/output/wiki_en/binarized_sentences_1000/*.arrow" \
     --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-    --base_save_dir "/data-3/priyam/translation/output/wiki_en/model_out" \
+    --base_save_dir "/data-3/priyam/translation/output/wiki_en/model_out_1000" \
     --joblib_temp_folder "/data-3/priyam/translation/tmp" \
     --batch_size 512 \
     --total_procs 64 \
     --devices "0,1"
+
+HF_DATASETS_CACHE=/data-3/priyam/tmp python decode.py \
+    --root_dir "/data-3/priyam/translation" \
+    --data_files "/data-3/priyam/translation/output/wiki_en/model_out_1000/*/*.arrow" \
+    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
+    --decode_dir "/data-3/priyam/translation/output/wiki_en/translated_1000" \
+    --joblib_temp_folder "/data-3/priyam/translation/tmp" \
+    --batch_size 4 \
+    --total_procs 1 \
+    --run_joblib False \
+    --src_lang eng_Latn \
+    --tgt_lang hin_Deva

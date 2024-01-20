@@ -40,7 +40,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--binarized_dir",
+        "--decode_dir",
         type=str,
     )
 
@@ -78,7 +78,7 @@ def parse_args():
 
     return args
 
-def binarize(
+def decode(
     batch,
     tokenizer, 
     ip,
@@ -86,33 +86,18 @@ def binarize(
     tgt_lang="hin_Deva"
 ):
     p_batch = dict()
-
-    sentences = ip.preprocess_batch(
-        batch["sub_strs"], 
-        src_lang=src_lang,
-        tgt_lang=tgt_lang
-    )
-
-    placeholder_entity_maps = list(map(lambda ple_map: json.dumps(ple_map), ip.get_placeholder_entity_maps(clear_ple_maps=True)))
-
-    p_batch["input_ids"], p_batch["attention_masks"] = tokenizer(
-        sentences, 
-        src=True, 
-        return_tensors="pt",
-    ).values()
-
-    return {
-        "tlt_idx": torch.tensor(batch["tlt_idx"]), 
-    } | p_batch | {
-        "placeholder_entity_map": placeholder_entity_maps,
-    }
+    input_ids = batch.pop("translation_ids")
+    placeholder_entity_maps = list(map(lambda ple_map: json.loads(ple_map), batch["placeholder_entity_map"]))
+    outputs = tokenizer.batch_decode(input_ids, src=False)
+    p_batch["translated"] = ip.postprocess_batch(outputs, lang=tgt_lang, placeholder_entity_maps=placeholder_entity_maps)
+    return p_batch
 
 def _mp_fn(
     index,
     total_procs,
     ds,
-    binarize_procs,
-    binarized_dir,
+    decode_procs,
+    decode_dir,
     batch_size,
     src_lang,
     tgt_lang,
@@ -127,9 +112,9 @@ def _mp_fn(
         world_size=total_procs,
     )
 
-    binarized_ds = rank_ds.map(
+    decoded_ds = rank_ds.map(
         partial(
-            binarize,
+            decode,
             tokenizer=tokenizer,
             ip=ip,
             src_lang=src_lang,
@@ -137,14 +122,15 @@ def _mp_fn(
         ),
         batched=True,
         batch_size=batch_size,
-        num_proc=binarize_procs,
+        num_proc=decode_procs,
+        remove_columns=["translation_ids", "placeholder_entity_map"]
     )
 
-    save_dir = os.path.join(binarized_dir, f"{index}")
+    save_dir = os.path.join(decode_dir, f"{index}")
     os.makedirs(save_dir, ok_exist=True)
-    binarized_ds.save_to_disk(
+    decoded_ds.save_to_disk(
         save_dir,
-        num_proc=binarize_procs,
+        num_proc=decode_procs,
     )
 
     return True
@@ -193,9 +179,9 @@ if __name__ == "__main__":
 
         print("Loaded Tokenizer and IP ....")
 
-        binarized_ds = ds.map(
+        decoded_ds = ds.map(
             partial(
-                binarize,
+                decode,
                 tokenizer=tokenizer,
                 ip=ip,
                 src_lang=args.src_lang,
@@ -204,10 +190,11 @@ if __name__ == "__main__":
             batched=True,
             batch_size=args.batch_size,
             num_proc=args.total_procs,
+            remove_columns=["translation_ids", "placeholder_entity_map"]
         )
 
-        binarized_ds.save_to_disk(
-            args.binarized_dir,
+        decoded_ds.save_to_disk(
+            args.decode_dir,
             num_proc=args.total_procs,
         )
 

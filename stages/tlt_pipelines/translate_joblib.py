@@ -141,7 +141,7 @@ def _mp_fn(
     model = model.eval().to(device)
 
     run_ds = HFDataset.from_dict(
-        { key: [] for key in ["doc_id", "sids" "sub_strs", "tlt_idx", "translation_ids"] },
+        { key: [] for key in ["doc_id", "sids" "sub_strs", "tlt_idx", "placeholder_entity_map", "translation_ids"] },
     )
 
     with torch.no_grad():
@@ -166,6 +166,7 @@ def _mp_fn(
                             "sids": batch["sids"], 
                             "sub_strs": batch["sub_strs"], 
                             "tlt_idx": batch["tlt_idx"], 
+                            "placeholder_entity_map": batch["placeholder_entity_map"],
                             "translation_ids": outputs.to("cpu"),
                         }
                     ),
@@ -174,7 +175,7 @@ def _mp_fn(
 
     save_dir = os.path.join(base_save_dir, f"rank_{rank}-device_{device}")
     os.makedirs(save_dir, exist_ok=True)
-    output_ds.save_to_disk(
+    run_ds.save_to_disk(
         save_dir,
         num_proc=procs_to_write,
     )

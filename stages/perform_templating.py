@@ -298,6 +298,24 @@ def write_to_doc_lvl_csvs(
     return samples | {
         "csv_path": csv_paths,
     }
+
+def add_tlt_folder_path(
+    samples,
+    idx,
+    base_save_path=None,
+):
+    batch_folder_name = sha256(f"{idx}".encode('utf-8')).hexdigest()
+    batch_folder_path = os.path.join(base_save_path, batch_folder_name)
+    
+    tlt_folders = []
+
+    for i in range(len(samples["doc_id"])):
+        tlt_folders += [os.path.join(batch_folder_path, samples["doc_id"][i])]
+
+    return samples | {
+        "tlt_folder": tlt_folders,
+    }
+
     
 if __name__ == "__main__":
 
@@ -335,7 +353,7 @@ if __name__ == "__main__":
         print(f"Performed `terminal punctuation check`")
 
     sent_tokenization_model = spacy.load("en_core_web_md") if use_spacy else None
-    os.makedirs(args.base_save_path, exist_ok=True)
+
     rw_templated = rw.map(
         partial(
             perform_templating,
@@ -367,6 +385,8 @@ if __name__ == "__main__":
 
     if args.write_to_mini_csvs:
 
+        os.makedirs(args.base_save_path, exist_ok=True)
+
         write_style = {
             "batch": write_to_batch_lvl_csvs,
             "doc": write_to_doc_lvl_csvs,
@@ -389,6 +409,20 @@ if __name__ == "__main__":
         csv_paths_file = os.path.join(args.base_save_path, "paths.csv")
         csv_paths.to_csv(csv_paths_file, num_proc=64)
         print(f"Saved `paths.csv` to {csv_paths_file}")
+
+    rw_templated_filtered = rw_templated_filtered.map(
+            partial(
+                add_tlt_folder_path,
+                base_save_path=args.base_save_path,
+            ),
+            batched=True,
+            batch_size=256,
+            num_proc=64,
+            load_from_cache_file=args.use_cache,
+            with_indices=True
+        )
+
+    os.makedirs(args.save_path, exist_ok=True)
 
     rw_templated_filtered.save_to_disk(args.save_path, num_proc=64)
     print(f"Saved `templated` dataset to {args.save_path}")

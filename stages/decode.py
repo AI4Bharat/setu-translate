@@ -81,16 +81,33 @@ def parse_args():
 def decode(
     batch,
     tokenizer, 
-    ip,
     src_lang="eng_Latn",
     tgt_lang="hin_Deva"
 ):
+    
+    ip = IndicProcessor(inference=True)
+    
     p_batch = dict()
-    input_ids = batch.pop("translation_ids")
+    input_ids = batch.pop("translated_input_ids")
     placeholder_entity_maps = list(map(lambda ple_map: json.loads(ple_map), batch["placeholder_entity_map"]))
     outputs = tokenizer.batch_decode(input_ids, src=False)
     p_batch["translated"] = ip.postprocess_batch(outputs, lang=tgt_lang, placeholder_entity_maps=placeholder_entity_maps)
     return p_batch
+
+def save_to_str_lvl(batch):
+    written_file = []
+    for i in range(len(batch["sid"])):
+        try:
+            file_dir = os.path.dirname(batch["tlt_file_loc"][i])
+            os.makedirs(file_dir, exist_ok=True)
+            with open(batch["tlt_file_loc"][i], "w") as str_f:
+                str_f.write(batch["translated"][i])
+            written_file += [True]
+        except Exception as e:
+            written_file += [False]
+    return batch | {
+        "written": written_file
+    }
 
 def _mp_fn(
     index,
@@ -104,7 +121,6 @@ def _mp_fn(
 ):
 
     tokenizer = IndicTransTokenizer(direction="en-indic")
-    ip = IndicProcessor(inference=True)
 
     rank_ds = split_dataset_by_node(
         ds, 
@@ -116,14 +132,20 @@ def _mp_fn(
         partial(
             decode,
             tokenizer=tokenizer,
-            ip=ip,
             src_lang=src_lang,
             tgt_lang=tgt_lang,
         ),
         batched=True,
         batch_size=batch_size,
         num_proc=decode_procs,
-        remove_columns=["translation_ids", "placeholder_entity_map"]
+        remove_columns=["translated_input_ids", "placeholder_entity_map"]
+    )
+
+    decoded_ds = decoded_ds.map(
+        save_to_str_lvl,
+        batched=True,
+        batch_size=batch_size,
+        num_proc=decode_procs,
     )
 
     save_dir = os.path.join(decode_dir, f"{index}")
@@ -175,7 +197,6 @@ if __name__ == "__main__":
     else:
 
         tokenizer = IndicTransTokenizer(direction="en-indic")
-        ip = IndicProcessor(inference=True)
 
         print("Loaded Tokenizer and IP ....")
 
@@ -183,15 +204,23 @@ if __name__ == "__main__":
             partial(
                 decode,
                 tokenizer=tokenizer,
-                ip=ip,
                 src_lang=args.src_lang,
                 tgt_lang=args.tgt_lang,
             ),
             batched=True,
             batch_size=args.batch_size,
             num_proc=args.total_procs,
-            remove_columns=["translation_ids", "placeholder_entity_map"]
+            remove_columns=["translated_input_ids", "placeholder_entity_map"]
         )
+
+        decoded_ds = decoded_ds.map(
+            save_to_str_lvl,
+            batched=True,
+            batch_size=args.batch_size,
+            num_proc=args.total_procs,
+        )
+
+        os.makedirs(args.decode_dir, exist_ok=True)
 
         decoded_ds.save_to_disk(
             args.decode_dir,

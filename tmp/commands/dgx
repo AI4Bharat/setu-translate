@@ -1,53 +1,102 @@
 #!/usr/bin/bash
 
-HF_DATASETS_CACHE=/data-3/priyam/tmp python perform_templating.py \
-    --glob_path "/data-3/priyam/translation/data/wiki_en/wiki_en_data.parquet" \
-    --cache_dir_for_original_data "/data-3/priyam/translation/data/wiki_en/cache" \
-    --base_save_path "/data-3/priyam/translation/output/wiki_en/doc_csvs" \
-    --save_path "/data-3/priyam/translation/output/wiki_en/templated_1000" \
+prev=""
+# prev="35%"
+
+for i in {5..100..5}
+# for i in {40..100..5}
+do
+   
+   echo "Processing split = train[${prev}:${i}%]....."
+   
+   HF_DATASETS_CACHE=tmp python setu-translate/stages/perform_templating.py \
+    --glob_path "data/wiki_en/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "data/wiki_en/cache" \
+    --base_save_path "output/wiki_en/batches/${i}/doc_csvs" \
+    --save_path "output/wiki_en/batches/${i}/templated" \
     --text_col body \
     --url_col url \
     --timestamp_col timestamp \
     --source_type wiki_en \
     --translation_type sentence \
     --use_cache False \
-    --split "train[:1000]"
+    --split "train[${prev}:${i}%]"
 
-HF_DATASETS_CACHE=/data-3/priyam/tmp python create_global_ds.py \
-    --paths_data "/data-3/priyam/translation/output/wiki_en/templated_1000/*.arrow" \
-    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-    --global_sent_ds_path "/data-3/priyam/translation/output/wiki_en/sentences_1000"
+    HF_DATASETS_CACHE=tmp python setu-translate/stages/create_global_ds.py \
+        --paths_data "output/wiki_en/batches/${i}/templated/*.arrow" \
+        --cache_dir "data/wiki_en/cache" \
+        --global_sent_ds_path "output/wiki_en/batches/${i}/sentences"
 
-HF_DATASETS_CACHE=/data-3/priyam/tmp python binarize.py \
-    --root_dir "/data-3/priyam/translation" \
-    --data_files "/data-3/priyam/translation/output/wiki_en/sentences_1000/*.arrow" \
-    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-    --binarized_dir "/data-3/priyam/translation/output/wiki_en/binarized_sentences_1000" \
-    --joblib_temp_folder "/data-3/priyam/translation/tmp" \
-    --batch_size 512 \
-    --total_procs 64 \
-    --run_joblib False \
-    --src_lang eng_Latn \
-    --tgt_lang hin_Deva
+    HF_DATASETS_CACHE=tmp python setu-translate/stages/binarize.py \
+        --root_dir "$PWD" \
+        --data_files "output/wiki_en/batches/${i}/sentences/*.arrow" \
+        --cache_dir "data/wiki_en/cache" \
+        --binarized_dir "output/wiki_en/batches/${i}/binarized_sentences" \
+        --joblib_temp_folder "tmp" \
+        --batch_size 512 \
+        --total_procs 64 \
+        --run_joblib False \
+        --src_lang eng_Latn \
+        --tgt_lang hin_Deva
 
-HF_DATASETS_CACHE=/data-3/priyam/tmp python tlt_pipelines/translate_joblib.py \
-    --root_dir "/data-3/priyam/translation" \
-    --data_files "/data-3/priyam/translation/output/wiki_en/binarized_sentences_1000/*.arrow" \
-    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-    --base_save_dir "/data-3/priyam/translation/output/wiki_en/model_out_1000" \
-    --joblib_temp_folder "/data-3/priyam/translation/tmp" \
-    --batch_size 512 \
-    --total_procs 64 \
-    --devices "0,1"
+    prev="${i}%"
 
-HF_DATASETS_CACHE=/data-3/priyam/tmp python decode.py \
-    --root_dir "/data-3/priyam/translation" \
-    --data_files "/data-3/priyam/translation/output/wiki_en/model_out_1000/*/*.arrow" \
-    --cache_dir "/data-3/priyam/translation/data/wiki_en/cache" \
-    --decode_dir "/data-3/priyam/translation/output/wiki_en/translated_1000" \
-    --joblib_temp_folder "/data-3/priyam/translation/tmp" \
-    --batch_size 4 \
-    --total_procs 1 \
-    --run_joblib False \
-    --src_lang eng_Latn \
-    --tgt_lang hin_Deva
+done
+
+# HF_DATASETS_CACHE=tmp python setu-translate/stages/perform_templating.py \
+#     --glob_path "data/wiki_en/wiki_en_data.parquet" \
+#     --cache_dir_for_original_data "data/wiki_en/cache" \
+#     --base_save_path "output/wiki_en/doc_csvs_1000" \
+#     --save_path "output/wiki_en/templated_1000" \
+#     --text_col body \
+#     --url_col url \
+#     --timestamp_col timestamp \
+#     --source_type wiki_en \
+#     --translation_type sentence \
+#     --use_cache False \
+#     --split "train[:1000]"
+
+# HF_DATASETS_CACHE=tmp python setu-translate/stages/create_global_ds.py \
+#     --paths_data "output/wiki_en/templated_1000/*.arrow" \
+#     --cache_dir "data/wiki_en/cache" \
+#     --global_sent_ds_path "output/wiki_en/sentences_1000"
+
+# HF_DATASETS_CACHE=tmp python setu-translate/stages/binarize.py \
+#     --root_dir "$PWD" \
+#     --data_files "output/wiki_en/sentences_1000/*.arrow" \
+#     --cache_dir "data/wiki_en/cache" \
+#     --binarized_dir "output/wiki_en/binarized_sentences_1000" \
+#     --joblib_temp_folder "tmp" \
+#     --batch_size 512 \
+#     --total_procs 64 \
+#     --run_joblib False \
+#     --src_lang eng_Latn \
+#     --tgt_lang hin_Deva
+
+# HF_DATASETS_CACHE=tmp python setu-translate/stages/tlt_pipelines/translate_joblib.py \
+#     --root_dir "$PWD" \
+#     --data_files "output/wiki_en/binarized_sentences_1000/*.arrow" \
+#     --cache_dir "data/wiki_en/cache" \
+#     --base_save_dir "output/wiki_en/model_out_1000" \
+#     --joblib_temp_folder "tmp" \
+#     --batch_size 512 \
+#     --total_procs 64 \
+#     --devices "0"
+
+# HF_DATASETS_CACHE=tmp python setu-translate/stages/decode.py \
+#     --root_dir "$PWD" \
+#     --data_files "output/wiki_en/model_out_1000/*/*.arrow" \
+#     --cache_dir "data/wiki_en/cache" \
+#     --decode_dir "output/wiki_en/translated_1000" \
+#     --joblib_temp_folder "tmp" \
+#     --batch_size 4 \
+#     --total_procs 1 \
+#     --run_joblib False \
+#     --src_lang eng_Latn \
+#     --tgt_lang hin_Deva
+
+HF_DATASETS_CACHE=tmp python setu-translate/stages/replace_en_to_hi.py \
+    --paths_data "output/wiki_en/templated_1000/*.arrow" \
+    --cache_dir "data/wiki_en/cache" \
+    --translated_save_path "output/wiki_en/final_1000"
+

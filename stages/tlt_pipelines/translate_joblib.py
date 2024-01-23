@@ -159,15 +159,16 @@ def _mp_fn(
 
             run_ds = concatenate_datasets(
                 [
-                    run_ds, 
+                    run_ds,
                     HFDataset.from_dict(
                         {
                             "doc_id": batch["input_ids"], 
-                            "sids": batch["sids"], 
-                            "sub_strs": batch["sub_strs"], 
+                            "sid": batch["sids"], 
+                            "sub_str": batch["sub_strs"], 
                             "tlt_idx": batch["tlt_idx"], 
                             "placeholder_entity_map": batch["placeholder_entity_map"],
-                            "translation_ids": outputs.to("cpu"),
+                            "translated_input_ids": outputs.to("cpu"),
+                            "tlt_file_loc": batch["tlt_file_loc"],
                         }
                     ),
                 ], 

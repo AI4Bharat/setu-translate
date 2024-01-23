@@ -81,11 +81,12 @@ def parse_args():
 def binarize(
     batch,
     tokenizer, 
-    ip,
     src_lang="eng_Latn",
     tgt_lang="hin_Deva"
 ):
     p_batch = dict()
+
+    ip = IndicProcessor(inference=True)
 
     sentences = ip.preprocess_batch(
         batch["sub_strs"], 
@@ -119,7 +120,6 @@ def _mp_fn(
 ):
 
     tokenizer = IndicTransTokenizer(direction="en-indic")
-    ip = IndicProcessor(inference=True)
 
     rank_ds = split_dataset_by_node(
         ds, 
@@ -131,7 +131,6 @@ def _mp_fn(
         partial(
             binarize,
             tokenizer=tokenizer,
-            ip=ip,
             src_lang=src_lang,
             tgt_lang=tgt_lang,
         ),
@@ -189,7 +188,6 @@ if __name__ == "__main__":
     else:
 
         tokenizer = IndicTransTokenizer(direction="en-indic")
-        ip = IndicProcessor(inference=True)
 
         print("Loaded Tokenizer and IP ....")
 
@@ -197,7 +195,6 @@ if __name__ == "__main__":
             partial(
                 binarize,
                 tokenizer=tokenizer,
-                ip=ip,
                 src_lang=args.src_lang,
                 tgt_lang=args.tgt_lang,
             ),
@@ -205,6 +202,8 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             num_proc=args.total_procs,
         )
+
+        os.makedirs(args.binarized_dir, exist_ok=True)
 
         binarized_ds.save_to_disk(
             args.binarized_dir,

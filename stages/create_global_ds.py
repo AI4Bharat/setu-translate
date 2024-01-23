@@ -3,6 +3,7 @@ import glob
 import pandas as pd
 import argparse
 import json
+import os
 
 def parse_args():
 
@@ -32,7 +33,7 @@ def parse_args():
 
 def flatten_substr(
     samples,
-    keys=["doc_id", "sids", "sub_strs"],
+    keys=["doc_id", "sids", "sub_strs", "tlt_file_loc"],
 ):
     out = {key: [] for key in keys}
     for i in range(len(samples["doc_id"])):
@@ -55,6 +56,9 @@ def flatten_substr(
         for key, value in [("sids", sids), ("sub_strs", sub_strs)]:
             for idx in substr_idx:
                 out[key] += [value[idx]]
+
+        for idx in substr_idx:
+            out["tlt_file_loc"] += [os.path.join(samples["tlt_folder"][i], sids[idx])]
 
     return out
     
@@ -85,6 +89,8 @@ if __name__ == "__main__":
         num_proc=64,
         with_indices=True
     )
+
+    os.makedirs(args.global_sent_ds_path, exist_ok=True)
 
     sentence_ds.save_to_disk(
         args.global_sent_ds_path,

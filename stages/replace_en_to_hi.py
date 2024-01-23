@@ -7,11 +7,49 @@ import re
 import pandas as pd
 import csv
 from document import Document
-import dask.dataframe as dd
 import pickle
 import json
+import argparse
 
-sample_size = 100
+def parse_args():
+
+    parser = argparse.ArgumentParser(description="Perform replace on samples")
+
+    parser.add_argument(
+        "--paths_data",
+        type=str,
+        required=True
+    )
+
+    parser.add_argument(
+        "--cache_dir",
+        type=str,
+        required=True,
+    )
+
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        required=False,
+        default=64,
+    )
+
+    parser.add_argument(
+        "--num_procs",
+        type=int,
+        required=False,
+        default=512,
+    )
+
+    parser.add_argument(
+        "--translated_save_path",
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
 
 # Define a function for each match
 def replace_match(match, replacements):
@@ -19,10 +57,8 @@ def replace_match(match, replacements):
 
 def replace_en_to_hi(samples):
 
-    global_str_df = dd.read_csv(f"/data-3/priyam/translation/output/translation/sent_translated_{sample_size}.csv")
-    global_str_df = global_str_df.set_index("sid")
-
     translated = []
+    sub_strs_tlt = []
 
     for i in range(len(samples["doc_id"])):
         if not samples["text"][i] or not len(samples["text"][i]):
@@ -33,15 +69,20 @@ def replace_en_to_hi(samples):
 
         sids = json.loads(samples["sids"][i])
 
-        for sid in sids:
-            # replacements[f"{{sid::{sid}}}"] = global_str_df.loc[sid, "translated"].compute().iloc[0]
-            # print(sid)
-            # print(global_str_df.loc[sid].compute())
-            replacement_row = global_str_df.loc[sid].compute()
-            if len(replacement_row):
-                replacements[replacement_row["substr"].iloc[0]] = replacement_row["translated"].iloc[0]
-            # print(global_str_df.loc[sid, "translated"].compute().iloc[0])
-                # replacements[global_str_df.loc[sid, "substr"].compute().iloc[0]] = global_str_df.loc[sid, "translated"].compute().iloc[0]
+        sub_tlts = []
+
+        for s_idx, sid in enumerate(sids):
+
+            sid_tlt_file_path = os.path.join(samples["tlt_folder"][i], sid)
+
+            sub_strs = json.loads(samples["sub_strs"][i])
+
+            with open(sid_tlt_file_path, "r") as tlt_f:
+                tlt_sub = tlt_f.read()
+
+            replacements[sub_strs[s_idx]] = tlt_sub
+
+            sub_tlts += [tlt_sub]
 
         pattern = re.compile('|'.join(re.escape(key) for key in replacements.keys()))
 
@@ -49,30 +90,40 @@ def replace_en_to_hi(samples):
         translated += [
             pattern.sub(
                 partial(replace_match, replacements=replacements),
-                # samples["templated_text"][i],
                 samples["text"][i],
             )
         ]
 
+        sub_strs_tlt += [sub_tlts]
+
     return samples | {
-        "translated": translated
+        "translated": translated,
+        "substr_tlt": sub_strs_tlt,
     }
 
 if __name__ == "__main__":
 
-    templated_rw = load_dataset(
-        "csv",
-        data_files=[f"/data-3/priyam/translation/output/translation/template_{sample_size}.csv"],
-        cache_dir="/data-3/priyam/translation/refinedweb-mini/cache",
-        num_proc=96,
-        split="train"
+    args = parse_args()
+
+    paths_ds = load_dataset(
+        "arrow",
+        data_files=[args.paths_data],
+        cache_dir=args.cache_dir,
+        num_proc=args.num_procs,
+        split="train",
+        num_procs=args.num_procs
     )
 
-    translated_rw = templated_rw.map(
+    replace_ds = paths_ds.map(
         replace_en_to_hi,
         batched=True,
-        batch_size=1,
-        num_proc=96,
+        batch_size=args.batch_size,
+        num_proc=args.num_procs,
+        load_from_cache_file=False,
     )
 
-    translated_rw.to_csv(f"/data-3/priyam/translation/output/translation/translated_{sample_size}.csv")
+    os.makedirs(args.translated_save_path, exist_ok=True)
+    replace_ds.save_to_disk(
+        args.translated_save_path,
+        num_proc=args.num_procs,
+    )

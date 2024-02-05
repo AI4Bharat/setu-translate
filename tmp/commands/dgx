@@ -1,47 +1,78 @@
 #!/usr/bin/bash
 
-prev=""
-# prev="35%"
+prev=0
+max_limit=16266212
+shard_size=10000
+shards_count=$(echo "scale=4; ($max_limit + $shard_size - 1) / $shard_size" | bc)
+# Remove the decimal part
+shards_count=${shards_count%.*}
+shards_root_dir="output/wiki_en/shards/shards_${shards_count}"
+src_lang="eng_Latn"
+tgt_lang="hin_Deva"
 
-for i in {5..100..5}
-# for i in {40..100..5}
-do
-   
-   echo "Processing split = train[${prev}:${i}%]....."
-   
-   HF_DATASETS_CACHE=tmp python setu-translate/stages/perform_templating.py \
-    --glob_path "data/wiki_en/wiki_en_data.parquet" \
-    --cache_dir_for_original_data "data/wiki_en/cache" \
-    --base_save_path "output/wiki_en/batches/${i}/doc_csvs" \
-    --save_path "output/wiki_en/batches/${i}/templated" \
-    --text_col body \
-    --url_col url \
-    --timestamp_col timestamp \
-    --source_type wiki_en \
-    --translation_type sentence \
-    --use_cache False \
-    --split "train[${prev}:${i}%]"
+create_shard() {
+
+    prev=$1
+    i=$2
+    src_lang=$3
+    tgt_lang=$4
+
+    echo "Arguments for shard creation: prev=${prev}, i=${i}, src_lang=${src_lang}, tgt_lang=${tgt_lang}"
+
+    HF_DATASETS_CACHE=tmp python setu-translate/stages/perform_templating.py \
+        --glob_path "data/wiki_en/wiki_en_data.parquet" \
+        --cache_dir_for_original_data "data/wiki_en/cache" \
+        --base_save_path "$shards_root_dir/${i}/doc_csvs" \
+        --save_path "$shards_root_dir/${i}/templated" \
+        --text_col body \
+        --url_col url \
+        --timestamp_col timestamp \
+        --source_type wiki_en \
+        --translation_type sentence \
+        --use_cache False \
+        --split "train[${prev}:${i}]"
 
     HF_DATASETS_CACHE=tmp python setu-translate/stages/create_global_ds.py \
-        --paths_data "output/wiki_en/batches/${i}/templated/*.arrow" \
+        --paths_data "$shards_root_dir/${i}/templated/*.arrow" \
         --cache_dir "data/wiki_en/cache" \
-        --global_sent_ds_path "output/wiki_en/batches/${i}/sentences"
+        --global_sent_ds_path "$shards_root_dir/${i}/sentences"
 
-    HF_DATASETS_CACHE=tmp python setu-translate/stages/binarize.py \
-        --root_dir "$PWD" \
-        --data_files "output/wiki_en/batches/${i}/sentences/*.arrow" \
-        --cache_dir "data/wiki_en/cache" \
-        --binarized_dir "output/wiki_en/batches/${i}/binarized_sentences" \
-        --joblib_temp_folder "tmp" \
-        --batch_size 512 \
-        --total_procs 64 \
-        --run_joblib False \
-        --src_lang eng_Latn \
-        --tgt_lang hin_Deva
+    # HF_DATASETS_CACHE=tmp python setu-translate/stages/binarize.py \
+    #     --root_dir "$PWD" \
+    #     --data_files "$shards_root_dir/${i}/sentences/*.arrow" \
+    #     --cache_dir "data/wiki_en/cache" \
+    #     --binarized_dir "$shards_root_dir/${i}/binarized_sentences" \
+    #     --joblib_temp_folder "tmp" \
+    #     --batch_size 64 \
+    #     --total_procs 96 \
+    #     --run_joblib False \
+    #     --src_lang $src_lang \
+    #     --tgt_lang $tgt_lang
 
-    prev="${i}%"
+}
+
+for (( i=$shard_size; i<=$max_limit; i+=$shard_size ))
+do
+   
+    echo "Processing split = train[${prev}:${i}]....."
+   
+    create_shard $prev $i $src_lang $tgt_lang
+
+    prev=$i
 
 done
+
+echo "Completed loop-based sharding - prev=$prev...calculating 'remaining'"
+
+remaining=$(($max_limit - $prev))
+if [ $remaining -lt $shard_size ] && [ $remaining -ne 0 ]; then
+    echo "remaining = $remaining ... Creating a final shard from remaining data."
+    create_shard $prev $max_limit $src_lang $tgt_lang
+    echo "Exiting as entire dataset has been sharded."
+else
+    echo "remaining = $remaining ... Exiting as entire dataset has been sharded."
+fi
+
 
 # HF_DATASETS_CACHE=tmp python setu-translate/stages/perform_templating.py \
 #     --glob_path "data/wiki_en/wiki_en_data.parquet" \
@@ -95,8 +126,8 @@ done
 #     --src_lang eng_Latn \
 #     --tgt_lang hin_Deva
 
-HF_DATASETS_CACHE=tmp python setu-translate/stages/replace_en_to_hi.py \
-    --paths_data "output/wiki_en/templated_1000/*.arrow" \
-    --cache_dir "data/wiki_en/cache" \
-    --translated_save_path "output/wiki_en/final_1000"
+# HF_DATASETS_CACHE=tmp python setu-translate/stages/replace_en_to_hi.py \
+    # --paths_data "output/wiki_en/templated_1000/*.arrow" \
+    # --cache_dir "data/wiki_en/cache" \
+    # --translated_save_path "output/wiki_en/final_1000"
 

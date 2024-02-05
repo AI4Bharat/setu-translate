@@ -333,6 +333,8 @@ if __name__ == "__main__":
         split=args.split
     )
 
+    # rw = load_dataset("parquet",data_files=["data/wiki_en/wiki_en_data.parquet"],cache_dir="data/wiki_en/cache",num_proc=64,split="train[${prev}:${i}%]")
+
     print(f"Loaded Dataset from path - {args.glob_path}")
     
     if args.sample_size:

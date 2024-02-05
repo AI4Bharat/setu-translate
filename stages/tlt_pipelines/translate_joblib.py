@@ -154,7 +154,8 @@ def _mp_fn(
                 input_ids=input_ids,
                 num_beams=1,
                 num_return_sequences=1,
-                max_length=256
+                max_length=256,
+                do_sample=False,
             )
 
             run_ds = concatenate_datasets(

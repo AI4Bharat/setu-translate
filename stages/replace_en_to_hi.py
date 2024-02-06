@@ -19,6 +19,8 @@ def parse_args():
         "--paths_data",
         type=str,
         required=True
+
+        
     )
 
     parser.add_argument(

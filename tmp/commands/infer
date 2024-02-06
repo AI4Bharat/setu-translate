@@ -1,0 +1,25 @@
+
+
+# SETU_TRANSLATE_ROOT="/data/priyam/translation" HF_DATASETS_CACHE="/data/priyam/cache" python /data/priyam/translation/setu-translate/scripts/run_binarize_and_translate.py \
+#     --shards_root_dir "/data/priyam/translation/data/wiki-en/shards/shards_testing" \
+#     --data_cache_dir "/data/priyam/cache" \
+#     --joblib_temp_folder "/data/priyam/cache" \
+#     --src_lang eng_Latn \
+#     --tgt_lang hin_Deva \
+#     --num_procs_for_data_ops 64 \
+#     --batch_size 256 \
+#     --devices_for_translation "0" \
+#     --error_log_dir "/data/priyam/translation/outputs/wiki-en/shards_testing/logs" \
+#     --save_status_path "/data/priyam/translation/outputs/wiki-en/shards_testing/infer.status"
+
+
+SETU_TRANSLATE_ROOT="/data/priyam/translation" bash /data/priyam/translation/setu-translate/scripts/run_binarize_and_translate.sh \
+    --map_file "/data/priyam/translation/outputs/wiki-en/shards_testing/mapping/device_map_0" \
+    --data_cache_dir "/data/priyam/cache" \
+    --joblib_temp_folder "/data/priyam/cache" \
+    --src_lang "eng_Latn" \
+    --tgt_lang "hin_Deva" \
+    --num_procs_for_data_ops "64" \
+    --batch_size "256" \
+    --device "0" \
+    --out_base_dir "/data/priyam/translation/outputs/wiki-en/shards_1627/out"

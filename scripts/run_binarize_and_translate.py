@@ -73,6 +73,51 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def run_subprocess(command, shard_dir, stage):
+    try:
+        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
+            buffer = ''
+            while True:
+                # Check if child process has terminated
+                exit_code = p.poll()
+                if exit_code is not None:
+                    # If the exit code indicates an error, handle it accordingly
+                    if exit_code != 0:
+                        # Read any error message from stderr
+                        error_message = p.stderr.read().decode("utf-8")
+                        raise subprocess.CalledProcessError(
+                            cmd=command,
+                            stderr=f"`{stage}` process ended with error code {exit_code}:\n {error_message}",
+                            returncode=exit_code
+                        )
+                    break
+
+                character = p.stdout.read1().decode("utf-8")
+                if character == '\r':
+                    print(buffer, end='\r', flush=True)
+                    buffer = ''
+                elif character == '\n':
+                    print(buffer, flush=True)
+                    buffer = ''
+                else:
+                    buffer += character
+
+            # Make sure to read any remaining output after child process ends
+            buffer = p.stdout.read().decode("utf-8")
+            print(buffer, flush=True)
+
+            print(f"Completed `{stage}` for {shard_dir}")
+
+            return (shard_dir, None)
+
+    except subprocess.CalledProcessError as e:
+
+        error_file_path = os.path.join(log_dir, f"{os.path.split(shard_dir)[1]}.{stage}.error")
+        with open(error_file_path, "w") as error_f:
+            error_f.write(e.stderr)
+
+        return (shard_dir, error_file_path)
+
 def run_binarize_and_translate(
     shard_dir,
     setu_translate_root,
@@ -85,63 +130,61 @@ def run_binarize_and_translate(
     device_idx,
     log_dir,
 ):
-
-    try:
-        binarize_command = [
-            "python",
-            os.path.join(setu_translate_root, "setu-translate/stages/binarize.py"),
-            "--root_dir",
-            os.environ["PWD"],
-            "--data_files"
-            f"{shard_dir}/sentences/*.arrow",
-            "--cache_dir",
-            data_cache_dir,
-            "--binarized_dir",
-            f"{shard_dir}/{tgt_lang}/binarized_sentences",
-            "--joblib_temp_folder",
-            joblib_temp_folder,
-            "--batch_size",
-            batch_size,
-            "--total_procs,
-            num_procs_for_data_ops,
-            "--run_joblib",
-            False,
-            "--src_lang",
-            src_lang
-            "--tgt_lang",
-            tgt_lang
-        ]
-        result = subprocess.run(binarize_command, shell=True, check=True, capture_output=True)
-
-        translate_command = [
-            "python",
-            os.path.join(setu_translate_root, "setu-translate/stages/tlt_pipelines/translate_joblib.py"),
-            "--root_dir",
-            os.environ["PWD"],
-            "--data_files",
-            f"{shard_dir}/{tgt_lang}/binarized_sentences/*.arrow",
-            "--cache_dir",
-            data_cache_dir,
-            "--base_save_dir",
-            f"{shard_dir}/{tgt_lang}/model_out",
-            "--joblib_temp_folder",
-            joblib_temp_folder,
-            "--batch_size",
-            batch_size,
-            "--total_procs",
-            num_procs_for_data_ops,
-            "--devices",
-            device_idx,
-        ]
-        result = subprocess.run(translate_command, shell=True, check=True, capture_output=True)
-
-    except subprocess.CalledProcessError as e:
-        error_file_path = os.path.join(log_dir, f"{os.path.split()}.error")
-        with open(error_file_path, "w") as error_f:
-            error_f.write(result.stderr)
-        return (shard_dir, error_file_path)
+    print(f"Starting processing of: {shard_dir}")
+    binarize_command = [
+        "python",
+        os.path.join(setu_translate_root, "setu-translate/stages/binarize.py"),
+        "--root_dir",
+        os.environ["PWD"],
+        "--data_files",
+        f"{shard_dir}/sentences/*.arrow",
+        "--cache_dir",
+        data_cache_dir,
+        "--binarized_dir",
+        f"{shard_dir}/{tgt_lang}/binarized_sentences",
+        "--joblib_temp_folder",
+        joblib_temp_folder,
+        "--batch_size",
+        f"{batch_size}",
+        "--total_procs",
+        f"{num_procs_for_data_ops}",
+        "--run_joblib",
+        f"{False}",
+        "--src_lang",
+        src_lang,
+        "--tgt_lang",
+        tgt_lang
+    ]
     
-    return (shard_dir, None)
+    output = run_subprocess(binarize_command, shard_dir, "binarize")
+
+    if output[1]:
+        return output
+
+    translate_command = [
+        "python",
+        os.path.join(setu_translate_root, "setu-translate/stages/tlt_pipelines/translate_joblib.py"),
+        "--root_dir",
+        os.environ["PWD"],
+        "--data_files",
+        f"{shard_dir}/{tgt_lang}/binarized_sentences/*.arrow",
+        "--cache_dir",
+        data_cache_dir,
+        "--base_save_dir",
+        f"{shard_dir}/{tgt_lang}/model_out",
+        "--joblib_temp_folder",
+        joblib_temp_folder,
+        "--batch_size",
+        f"{batch_size}",
+        "--total_procs",
+        f"{num_procs_for_data_ops}",
+        "--devices",
+        f"{device_idx}",
+    ]
+
+    output = run_subprocess(translate_command, shard_dir, "translate")
+    
+    return output
 
 if __name__ == "__main__":
 
@@ -161,10 +204,10 @@ if __name__ == "__main__":
             joblib_temp_folder=args.joblib_temp_folder,
             src_lang=args.src_lang,
             tgt_lang=args.tgt_lang,
-            num_procs_for_data_ops=args.num_procs_for_data_ops,
+            num_procs_for_data_ops=args.num_procs_for_data_ops // len(args.devices_for_translation),
             batch_size=args.batch_size,
-            device_idx=idx % len(args.devices_for_translation),
-            log_dir=error_log_dir,
+            device_idx=args.devices_for_translation[idx % len(args.devices_for_translation)],
+            log_dir=args.error_log_dir,
         )  for idx, shard_dir in enumerate(glob.glob(os.path.join(args.shards_root_dir, "*")))
     )
 

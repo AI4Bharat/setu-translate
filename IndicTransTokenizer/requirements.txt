@@ -4,4 +4,4 @@ nltk
 sacremoses
 sentencepiece
 transformers
-indic-nlp-library @ git+https://github.com/VarunGumma/indic_nlp_library
+indic-nlp-library @ git+https://github.com/anoopkunchukuttan/indic_nlp_library.git

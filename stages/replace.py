@@ -18,9 +18,7 @@ def parse_args():
     parser.add_argument(
         "--paths_data",
         type=str,
-        required=True
-
-        
+        required=True        
     )
 
     parser.add_argument(
@@ -55,9 +53,9 @@ def parse_args():
 
 # Define a function for each match
 def replace_match(match, replacements):
-    return replacements[match.group(0)]
+    return replacements.get(match.group(0), match.group(0))
 
-def replace_en_to_hi(samples):
+def replace_translated(samples):
 
     translated = []
     sub_strs_tlt = []
@@ -65,6 +63,7 @@ def replace_en_to_hi(samples):
     for i in range(len(samples["doc_id"])):
         if not samples["text"][i] or not len(samples["text"][i]):
             translated += [str(None)]
+            sub_strs_tlt += [[str(None)]]
             continue
 
         replacements = dict()
@@ -78,6 +77,9 @@ def replace_en_to_hi(samples):
             sid_tlt_file_path = os.path.join(samples["tlt_folder"][i], sid)
 
             sub_strs = json.loads(samples["sub_strs"][i])
+
+            if not os.path.exists(sid_tlt_file_path):
+                continue
 
             with open(sid_tlt_file_path, "r") as tlt_f:
                 tlt_sub = tlt_f.read()
@@ -96,7 +98,7 @@ def replace_en_to_hi(samples):
             )
         ]
 
-        sub_strs_tlt += [sub_tlts]
+        sub_strs_tlt += [sub_tlts if len(sub_tlts) else [str(None)]]
 
     return samples | {
         "translated": translated,
@@ -109,15 +111,14 @@ if __name__ == "__main__":
 
     paths_ds = load_dataset(
         "arrow",
-        data_files=[args.paths_data],
+        data_files=glob.glob(args.paths_data),
         cache_dir=args.cache_dir,
         num_proc=args.num_procs,
         split="train",
-        num_procs=args.num_procs
     )
 
     replace_ds = paths_ds.map(
-        replace_en_to_hi,
+        replace_translated,
         batched=True,
         batch_size=args.batch_size,
         num_proc=args.num_procs,

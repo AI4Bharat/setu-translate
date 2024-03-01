@@ -138,7 +138,7 @@ while IFS= read -r line; do
 
     if [ $? -ne 0 ]; then
         echo "An error occurred with shard: $result"
-        echo $result > ${map_file}_errored
+        echo $result >> ${map_file}_errored
     else
         echo "Operation completed successfully"
     fi

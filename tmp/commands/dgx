@@ -114,17 +114,17 @@ fi
 #     --total_procs 64 \
 #     --devices "0"
 
-# HF_DATASETS_CACHE=tmp python setu-translate/stages/decode.py \
-#     --root_dir "$PWD" \
-#     --data_files "output/wiki_en/model_out_1000/*/*.arrow" \
-#     --cache_dir "data/wiki_en/cache" \
-#     --decode_dir "output/wiki_en/translated_1000" \
-#     --joblib_temp_folder "tmp" \
-#     --batch_size 4 \
-#     --total_procs 1 \
-#     --run_joblib False \
-#     --src_lang eng_Latn \
-#     --tgt_lang hin_Deva
+HF_DATASETS_CACHE=/data-3/priyam/tmp python /data/priyam/translation/setu-translate/stages/decode.py \
+    --root_dir "$PWD" \
+    --data_files "/data-3/priyam/translation/raj-out/out/*/npi_Deva/*/*/*.arrow" \
+    --cache_dir "/data-3/priyam/tmp" \
+    --decode_dir "decoded_substrs/npi_Deva" \
+    --joblib_temp_folder "/data-3/priyam/tmp" \
+    --batch_size 1028 \
+    --total_procs 128 \
+    --run_joblib False \
+    --src_lang eng_Latn \
+    --tgt_lang npi_Deva
 
 # HF_DATASETS_CACHE=tmp python setu-translate/stages/replace_en_to_hi.py \
     # --paths_data "output/wiki_en/templated_1000/*.arrow" \

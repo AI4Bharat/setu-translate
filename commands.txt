@@ -70,3 +70,10 @@ python create_global_ds.py \
     --global_sent_ds_path "/data-3/priyam/translation/output/wiki_en/sentences"
 
 docker run --shm-size=2048m --gpus=\"device=0,1,2,3,4,5,6,7\" --rm -v ${PWD}/../checkpoints/:/models/checkpoints -p 8000:8000 -t indictrans2_triton
+
+
+
+gcloud compute tpus tpu-vm create tpu-name \
+    --zone=us-central2-b \
+    --accelerator-type=v4-8 \
+    --version=tpu-ubuntu2204-base

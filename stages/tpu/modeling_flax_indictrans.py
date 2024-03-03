@@ -136,7 +136,7 @@ class FlaxIndicTransSinusoidalPositionalEmbedding(nn.Module):
         # Expand embeddings if needed
         max_pos = self.padding_idx + 1 + seq_len + past_key_values_length
         if max_pos > self.weights.shape[0]:
-            self.weights = self.make_weights(max_pos + self.offset, self.embedding_dim, self.weights, self.padding_idx)
+            self.weights = self._make_weights(max_pos + self.offset, self.embedding_dim, self.weights, self.padding_idx)
 
         return self.weights[position_ids.ravel()].reshape(bsz, seq_len, -1)
 

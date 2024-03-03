@@ -80,13 +80,14 @@ def parse_args():
 
 def binarize(
     batch,
-    tokenizer, 
+    # tokenizer, 
     src_lang="eng_Latn",
     tgt_lang="hin_Deva"
 ):
     p_batch = dict()
 
     ip = IndicProcessor(inference=True)
+    tokenizer = IndicTransTokenizer(direction="en-indic")
 
     sentences = ip.preprocess_batch(
         batch["sub_strs"], 
@@ -187,14 +188,12 @@ if __name__ == "__main__":
 
     else:
 
-        tokenizer = IndicTransTokenizer(direction="en-indic")
-
         print("Loaded Tokenizer and IP ....")
 
         binarized_ds = ds.map(
             partial(
                 binarize,
-                tokenizer=tokenizer,
+                # tokenizer=tokenizer,
                 src_lang=args.src_lang,
                 tgt_lang=args.tgt_lang,
             ),

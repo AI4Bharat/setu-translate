@@ -109,21 +109,21 @@ run_translation() {
         return 1
     fi
 
-    HF_DATASETS_CACHE=$data_cache_dir python ${SETU_TRANSLATE_ROOT}/setu-translate/stages/tlt_pipelines/translate_joblib.py \
-        --root_dir "$PWD" \
-        --data_files "${out_base_dir}/${shard_id}/${tgt_lang}/binarized_sentences/*.arrow" \
-        --cache_dir $data_cache_dir \
-        --base_save_dir "${out_base_dir}/${shard_id}/${tgt_lang}/model_out" \
-        --joblib_temp_folder $joblib_temp_folder \
-        --batch_size $batch_size \
-        --total_procs $num_procs_for_data_ops \
-        --devices $device
+    # HF_DATASETS_CACHE=$data_cache_dir python ${SETU_TRANSLATE_ROOT}/setu-translate/stages/tlt_pipelines/translate_joblib.py \
+    #     --root_dir "$PWD" \
+    #     --data_files "${out_base_dir}/${shard_id}/${tgt_lang}/binarized_sentences/*.arrow" \
+    #     --cache_dir $data_cache_dir \
+    #     --base_save_dir "${out_base_dir}/${shard_id}/${tgt_lang}/model_out" \
+    #     --joblib_temp_folder $joblib_temp_folder \
+    #     --batch_size $batch_size \
+    #     --total_procs $num_procs_for_data_ops \
+    #     --devices $device
 
-    # Check exit status of the second command
-    if [ $? -ne 0 ]; then
-        echo $shard_path
-        return 1
-    fi
+    # # Check exit status of the second command
+    # if [ $? -ne 0 ]; then
+    #     echo $shard_path
+    #     return 1
+    # fi
 
 }
 

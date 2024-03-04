@@ -235,6 +235,9 @@ class IndicTransTokenizer:
                 f"batch must be a list, but current batch is of type {type(batch)}"
             )
 
+        if padding == "max_length" and not max_length:
+            max_length = self.model_max_length - 1  # "- 1" is for EOS token
+
         # tokenize the source sentences
         batch = self.batch_tokenize(batch, src)
 

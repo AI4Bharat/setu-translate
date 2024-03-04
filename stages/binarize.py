@@ -45,11 +45,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--joblib_temp_folder",
-        type=str,
-    )
-
-    parser.add_argument(
         "--batch_size",
         type=int,
     )
@@ -60,8 +55,11 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--run_joblib",
-        type=str2bool
+        "--padding",
+        choices=["longest", "max_length"],
+        type=str,
+        default="longest",
+        required=False
     )
 
     parser.add_argument(
@@ -74,15 +72,24 @@ def parse_args():
         type=str,
     )
 
+    parser.add_argument(
+        "--return_format",
+        choices=["np", "pt"],
+        type=str,
+        default="np",
+        required=False
+    )
+
     args = parser.parse_args()
 
     return args
 
 def binarize(
     batch,
-    # tokenizer, 
+    padding="longest",
     src_lang="eng_Latn",
-    tgt_lang="hin_Deva"
+    tgt_lang="hin_Deva",
+    return_format="np",
 ):
     p_batch = dict()
 
@@ -97,10 +104,12 @@ def binarize(
 
     placeholder_entity_maps = list(map(lambda ple_map: json.dumps(ple_map), ip.get_placeholder_entity_maps(clear_ple_maps=True)))
 
-    p_batch["input_ids"], p_batch["attention_masks"] = tokenizer(
+    p_batch["input_ids"], p_batch["attention_mask"] = tokenizer(
         sentences, 
         src=True, 
-        return_tensors="pt",
+        padding=padding,
+        truncation=True if padding == "max_length" else False,
+        return_tensors=return_format,
     ).values()
 
     return {
@@ -108,46 +117,6 @@ def binarize(
     } | p_batch | {
         "placeholder_entity_map": placeholder_entity_maps,
     }
-
-def _mp_fn(
-    index,
-    total_procs,
-    ds,
-    binarize_procs,
-    binarized_dir,
-    batch_size,
-    src_lang,
-    tgt_lang,
-):
-
-    tokenizer = IndicTransTokenizer(direction="en-indic")
-
-    rank_ds = split_dataset_by_node(
-        ds, 
-        rank=index,
-        world_size=total_procs,
-    )
-
-    binarized_ds = rank_ds.map(
-        partial(
-            binarize,
-            tokenizer=tokenizer,
-            src_lang=src_lang,
-            tgt_lang=tgt_lang,
-        ),
-        batched=True,
-        batch_size=batch_size,
-        num_proc=binarize_procs,
-    )
-
-    save_dir = os.path.join(binarized_dir, f"{index}")
-    os.makedirs(save_dir, ok_exist=True)
-    binarized_ds.save_to_disk(
-        save_dir,
-        num_proc=binarize_procs,
-    )
-
-    return True
 
 
 if __name__ == "__main__":
@@ -164,49 +133,24 @@ if __name__ == "__main__":
 
     print("Loaded Dataset....")
 
-    if args.run_joblib:
-        
-        batch_status = Parallel(
-            n_jobs=args.total_procs,
-            verbose=0, 
-            prefer="processes",
-            batch_size="auto",
-            pre_dispatch='n_jobs',
-            temp_folder=args.joblib_temp_folder,
-        )(
-            delayed(_mp_fn)(
-                index=i,
-                total_procs=args.total_procs,
-                ds=ds,
-                binarize_procs=1,
-                binarized_dir=args.binarized_dir,
-                batch_size=args.batch_size,
-                src_lang=args.src_lang,
-                tgt_lang=args.tgt_lang,
-            ) for i in range(args.total_procs)
-        )
+    binarized_ds = ds.map(
+        partial(
+            binarize,
+            padding=args.padding,
+            src_lang=args.src_lang,
+            tgt_lang=args.tgt_lang,
+            return_format=args.return_format,
+        ),
+        batched=True,
+        batch_size=args.batch_size,
+        num_proc=args.total_procs,
+    )
 
-    else:
+    os.makedirs(args.binarized_dir, exist_ok=True)
 
-        print("Loaded Tokenizer and IP ....")
-
-        binarized_ds = ds.map(
-            partial(
-                binarize,
-                # tokenizer=tokenizer,
-                src_lang=args.src_lang,
-                tgt_lang=args.tgt_lang,
-            ),
-            batched=True,
-            batch_size=args.batch_size,
-            num_proc=args.total_procs,
-        )
-
-        os.makedirs(args.binarized_dir, exist_ok=True)
-
-        binarized_ds.save_to_disk(
-            args.binarized_dir,
-            num_proc=args.total_procs,
-        )
+    binarized_ds.save_to_disk(
+        args.binarized_dir,
+        num_proc=args.total_procs,
+    )
 
     

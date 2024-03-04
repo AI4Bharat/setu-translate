@@ -80,19 +80,22 @@ def parse_args():
 
 def decode(
     batch,
-    tokenizer, 
+    # tokenizer, 
     src_lang="eng_Latn",
     tgt_lang="hin_Deva"
 ):
     
     ip = IndicProcessor(inference=True)
-    
+    tokenizer = IndicTransTokenizer(direction="en-indic")
+
     p_batch = dict()
     input_ids = batch.pop("translated_input_ids")
     placeholder_entity_maps = list(map(lambda ple_map: json.loads(ple_map), batch["placeholder_entity_map"]))
     outputs = tokenizer.batch_decode(input_ids, src=False)
     p_batch["translated"] = ip.postprocess_batch(outputs, lang=tgt_lang, placeholder_entity_maps=placeholder_entity_maps)
-    return p_batch
+    return p_batch | {
+        "translated_input_ids": input_ids,
+    }
 
 def save_to_str_lvl(batch):
     written_file = []
@@ -138,7 +141,6 @@ def _mp_fn(
         batched=True,
         batch_size=batch_size,
         num_proc=decode_procs,
-        remove_columns=["translated_input_ids", "placeholder_entity_map"]
     )
 
     decoded_ds = decoded_ds.map(
@@ -196,21 +198,20 @@ if __name__ == "__main__":
 
     else:
 
-        tokenizer = IndicTransTokenizer(direction="en-indic")
+        # tokenizer = IndicTransTokenizer(direction="en-indic")
 
         print("Loaded Tokenizer and IP ....")
 
         decoded_ds = ds.map(
             partial(
                 decode,
-                tokenizer=tokenizer,
+                # tokenizer=tokenizer,
                 src_lang=args.src_lang,
                 tgt_lang=args.tgt_lang,
             ),
             batched=True,
             batch_size=args.batch_size,
             num_proc=args.total_procs,
-            remove_columns=["translated_input_ids", "placeholder_entity_map"]
         )
 
         decoded_ds = decoded_ds.map(

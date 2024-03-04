@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define options
-TEMP=$(getopt -o mcjstnbdo: --long map_file:,data_cache_dir:,joblib_temp_folder:,src_lang:,tgt_lang:,num_procs_for_data_ops:,batch_size:,device:,out_base_dir: -n '$0' -- "$@")
+TEMP=$(getopt -o mcjstnbdo: --long map_file:,data_cache_dir:,joblib_temp_folder:,src_lang:,tgt_lang:,num_procs_for_data_ops:,batch_size:,device:,out_base_dir:,padding:,return_format: -n '$0' -- "$@")
 
 # Exit if the options have not been properly specified.
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
@@ -25,10 +25,12 @@ data_cache_dir=''
 joblib_temp_folder=''
 src_lang=''
 tgt_lang=''
-num_procs_for_data_ops=''
-batch_size=''
+num_procs_for_data_ops='64'
+batch_size='256'
 device=''
 out_base_dir=''
+padding='longest'
+return_format='np'
 
 # Extract options and their arguments into variables.
 while true ; do
@@ -51,6 +53,10 @@ while true ; do
             device="$2"; shift 2 ;;
         -o|--out_base_dir)
             out_base_dir="$2"; shift 2;;
+        -p|--padding)
+            padding="$2"; shift 2;;
+        -r|--return_format)
+            return_format="$2"; shift 2;;
         --) shift ; break ;;
         *) echo "Internal error!" ; exit 1 ;;
     esac
@@ -65,6 +71,8 @@ check_arg "num_procs_for_data_ops" $num_procs_for_data_ops
 check_arg "batch_size" $batch_size
 check_arg "device" $device
 check_arg "out_base_dir" $out_base_dir
+check_arg "padding" $padding
+check_arg "return_format" $return_format
 
 echo "Running map-run using the following arguments:"
 echo "map_file=$map_file"
@@ -76,6 +84,8 @@ echo "num_procs_for_data_ops=$num_procs_for_data_ops"
 echo "batch_size=$batch_size"
 echo "device=$device"
 echo "out_base_dir=$out_base_dir"
+echo "padding=$padding"
+echo "return_format=$return_format"
 
 # The file to read from, provided as the first command line argument
 FILENAME=$map_file
@@ -96,12 +106,12 @@ run_translation() {
         --data_files "${shard_path}/sentences/*.arrow" \
         --cache_dir $data_cache_dir \
         --binarized_dir "${out_base_dir}/${shard_id}/${tgt_lang}/binarized_sentences" \
-        --joblib_temp_folder $joblib_temp_folder \
         --batch_size $batch_size \
         --total_procs $num_procs_for_data_ops \
-        --run_joblib False \
+        --padding $padding \
         --src_lang $src_lang \
-        --tgt_lang $tgt_lang
+        --tgt_lang $tgt_lang \
+        --return_format $return_format
 
     # Check exit status of the first command
     if [ $? -ne 0 ]; then

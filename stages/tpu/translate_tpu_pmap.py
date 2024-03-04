@@ -79,7 +79,7 @@ def padding_collator(
     batch,
     keys_to_pad=[
             ("input_ids", 1), 
-            ("attention_masks", 0),
+            ("attention_mask", 0),
         ]
     ):
 
@@ -93,8 +93,8 @@ def padding_collator(
 
         len_list = list(map(lambda x: len(x), batch_out[key]))
 
-        # padding_length = max(len_list)
-        padding_length = 256
+        padding_length = max(len_list)
+        # padding_length = 256
         array_list = []
         for i, x in enumerate(batch_out[key]):
 
@@ -103,7 +103,7 @@ def padding_collator(
                 padded_array = np.concatenate([np.full((padding_length - len(x)), value_to_pad_with), np.array(x)])
                 array_list.append(padded_array)
             else:
-                array_list.append(np.array(x)[:padding_length])
+                array_list.append(np.array(x))
 
         # Use np.stack to stack arrays along a new axis
         batch_out[key] = np.stack(array_list)
@@ -143,17 +143,17 @@ if __name__ == "__main__":
     params = replicate(model.params)
 
     def generate(
-        input_ids,
+        batch,
         params,
     ):
         model.params = params
         return model.generate(
-            input_ids=input_ids,
+            **batch,
             num_beams=1,
             num_return_sequences=1,
             max_length=256,
             do_sample=False,
-        )
+        ).sequences
 
     p_generate = jax.pmap(generate)
 
@@ -163,22 +163,23 @@ if __name__ == "__main__":
 
     for idx, batch in tqdm.tqdm(enumerate(data_loader, 0), unit=f"ba: {args.batch_size} samples/ba", total=len(data_loader)):
 
-        input_ids = shard(jnp.array(batch["input_ids"]))
+        input_batch = {
+            "input_ids": shard(jnp.array(batch["input_ids"])),
+            "attention_mask": shard(jnp.array(batch["attention_mask"]))
+        }
 
-        p_outputs = p_generate(input_ids, params)
+        outputs = p_generate(input_batch, params)
 
         if total_device_count != 1:
-            outputs = p_outputs[0].block_until_ready()
+            outputs = outputs.block_until_ready()
             outputs = outputs.reshape(-1, *outputs.shape[2:])
-        else:
-            outputs = p_outputs[0][0]
 
         run_ds = concatenate_datasets(
             [
                 run_ds,
                 HFDataset.from_dict(
                     {
-                        "doc_id": batch["input_ids"], 
+                        "input_ids": batch["input_ids"], 
                         "sid": batch["sids"], 
                         "sub_str": batch["sub_strs"], 
                         "tlt_idx": batch["tlt_idx"], 

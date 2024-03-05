@@ -5,7 +5,7 @@ from IndicTransTokenizer import IndicProcessor, IndicTransTokenizer
 from modeling_flax_indictrans import FlaxIndicTransForConditionalGeneration
 from transformers import FlaxAutoModelForSeq2SeqLM, AutoConfig
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 from jax_smi import initialise_tracking
 initialise_tracking()

@@ -78,7 +78,7 @@ def parse_args():
 def padding_collator(
     batch,
     keys_to_pad=[
-            ("input_ids", 1), 
+            ("input_ids", 1),
             ("attention_mask", 0),
         ]
     ):
@@ -170,9 +170,12 @@ if __name__ == "__main__":
 
         outputs = p_generate(input_batch, params)
 
+        outputs = outputs.block_until_ready()
+
         if total_device_count != 1:
-            outputs = outputs.block_until_ready()
             outputs = outputs.reshape(-1, *outputs.shape[2:])
+        else:
+            outputs = outputs[0]
 
         run_ds = concatenate_datasets(
             [

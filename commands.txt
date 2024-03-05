@@ -131,3 +131,13 @@ HF_DATASETS_CACHE=/data/priyam/tmp python /data/priyam/translation/setu-translat
     --run_joblib False \
     --src_lang eng_Latn \
     --tgt_lang hin_Deva
+
+
+
+
+python evaluate_metrics.py \
+    --base_save_dir /data/priyam/translation/setu-translate/stages/tpu/output/eval-results \
+    --direction "en-indic" \
+    --batch_size 256 \
+    --total_procs 128 \
+    --devices "2"

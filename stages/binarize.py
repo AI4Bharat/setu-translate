@@ -101,7 +101,7 @@ def binarize(
         src_lang=src_lang,
         tgt_lang=tgt_lang
     )
-
+    
     placeholder_entity_maps = list(map(lambda ple_map: json.dumps(ple_map), ip.get_placeholder_entity_maps(clear_ple_maps=True)))
 
     p_batch["input_ids"], p_batch["attention_mask"] = tokenizer(

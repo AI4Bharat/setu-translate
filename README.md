@@ -32,6 +32,6 @@ cd IndicTransTokenizer
 pip install --editable ./
 ```
 
-
 ## Overview
 
+![Setu Translate Stages Overview](./setu-translate-overview.png "Setu-Translate Overview")

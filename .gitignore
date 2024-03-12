@@ -161,3 +161,7 @@ cython_debug/
 
 flax_weights
 output
+examples/cache/
+examples/output/
+examples/sample_data/wiki_en_data.parquet
+tmp/

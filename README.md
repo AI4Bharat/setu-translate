@@ -18,23 +18,20 @@ git clone https://github.com/AI4Bharat/setu-translate.git
 ```
 2. Prepare environment
 ```bash
-
-```
-
-https://ai4b-public-nlu-nlg.objectstore.e2enetworks.net/ai4b-public-nlu-nlg/sangraha/translation/it2_flax_weights.tar.gz
-
-```bash
 conda create -n translate-env python=3.10
-
 conda activate translate-env
-
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+conda install -c conda-forge pyspark
+conda install pip
 pip install datasets transformers
-
+```
+3. Install IndicTransTokenizer
+```bash
 cd IndicTransTokenizer
 
 pip install --editable ./
 ```
 
+
 ## Overview
+

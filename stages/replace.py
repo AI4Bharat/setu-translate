@@ -42,6 +42,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--decode_base_path",
+        type=str,
+        required=False,
+        default=None,
+    )
+
+    parser.add_argument(
         "--translated_save_path",
         type=str,
         required=True,
@@ -55,7 +62,7 @@ def parse_args():
 def replace_match(match, replacements):
     return replacements.get(match.group(0), match.group(0))
 
-def replace_translated(samples):
+def replace_translated(samples, decode_base_path=None):
 
     translated = []
     sub_strs_tlt = []
@@ -77,6 +84,9 @@ def replace_translated(samples):
             sid_tlt_file_path = os.path.join(samples["tlt_folder"][i], sid)
 
             sub_strs = json.loads(samples["sub_strs"][i])
+
+            if decode_base_path:
+                sid_tlt_file_path = os.path.join(decode_base_path, *sid_tlt_file_path.split("/")[-2:])
 
             if not os.path.exists(sid_tlt_file_path):
                 continue
@@ -118,7 +128,7 @@ if __name__ == "__main__":
     )
 
     replace_ds = paths_ds.map(
-        replace_translated,
+        partial(replace_translated, decode_base_path=args.decode_base_path),
         batched=True,
         batch_size=args.batch_size,
         num_proc=args.num_procs,

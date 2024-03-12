@@ -135,7 +135,7 @@ if __name__ == "__main__":
     )
 
     model = FlaxIndicTransForConditionalGeneration.from_pretrained(
-        "/data/priyam/translation/setu-translate/stages/tpu/flax_weights/200m",
+        "setu-translate/stages/tpu/flax_weights/200m",
         local_files_only=True,
         dtype=jnp.bfloat16,
     )

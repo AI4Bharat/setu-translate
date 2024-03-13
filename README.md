@@ -25,6 +25,10 @@ The Setu-Translate Pipeline contains 4 main stages:
 
 - [Translate](./stages/tlt_pipelines/translate_joblib.py) The translation stage utilizes [IndicTrans2](https://huggingface.co/ai4bharat/indictrans2-en-indic-dist-200M) translation model to translate the English sentences to the corresponding target Indic languages. We provide support to run translation either on [local](./stages/tlt_pipelines/translate_joblib.py) or [TPU](./stages/tpu/translate_tpu_pmap.py) cluster for larger datasets.
 
+- [Decode](./stages/decode.py) The decode stages process the model output data and replaces the translated ids into their corresponding Indic Text and provides us with the translated text.
+
+- [Replace](./stages/replace.py) During this stage, the translated words are appropriately replaced with the original text positions to maintain document structure. This depends on the output of the templating stage.
+
 ## Quickstart
 
 1. Clone repository
@@ -108,7 +112,7 @@ HF_DATASETS_CACHE=/home/$USER/tmp python tlt_pipelines/translate_joblib.py \
 ```bash
 HF_DATASETS_CACHE=/home/$USER/tmp python decode.py \
     --root_dir "/home/$USER/setu-translate" \
-    --data_files "/home/$USER/setu-translate/examples/output/wiki_en/model_out/rank_0-device_cuda:0/data-00000-of-00001.arrow" \
+    --data_files "/home/$USER/setu-translate/examples/output/wiki_en/model_out/*/*.arrow" \
     --cache_dir "/home/$USER/setu-translate/examples/cache" \
     --decode_dir "/home/$USER/setu-translate/examples/output/wiki_en/decode" \
     --batch_size 64 \
@@ -120,12 +124,13 @@ HF_DATASETS_CACHE=/home/$USER/tmp python decode.py \
 ### Replace Stage
 ```bash
 HF_DATASETS_CACHE=/home/$USER/tmp python replace.py \
-    --paths_data "/home/$USER/setu-translate/examples/output/wiki_en/templated/data-00000-of-00064.arrow" \
+    --paths_data "/home/$USER/setu-translate/examples/output/wiki_en/templated/*.arrow" \
     --cache_dir "/home/$USER/setu-translate/examples/cache" \
     --batch_size 64 \
     --num_procs 1 \
-    --decode_base_path "/home/$USER/setu-translate/examples/output/wiki_en/decode/*.arrow" \
+    --decode_base_path "/home/$USER/setu-translate/examples/output/wiki_en decode/*.arrow" \
     --translated_save_path "/home/$USER/setu-translate/examples/output/wiki_en/translated"
 ```
+
 
 

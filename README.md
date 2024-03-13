@@ -1,4 +1,4 @@
-# Setu-Translate: A Large Scale Translation pipeline
+# Setu-Translate: A Large Scale Translation Pipeline
 
 Setu-Translate uses [IndicTrans2 (IT2) ](https://github.com/AI4Bharat/IndicTrans2) for performing large-scale translation across English and 22 Indic Languages.
 
@@ -89,7 +89,7 @@ HF_DATASETS_CACHE=/home/$USER/tmp python binarize.py \
     --padding max_length \
     --src_lang eng_Latn \
     --tgt_lang hin_Deva \
-    --return_format pt
+    --return_format np
 ```
 ### Translate Stage
 ```bash

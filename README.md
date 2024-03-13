@@ -104,6 +104,28 @@ HF_DATASETS_CACHE=/home/$USER/tmp python tlt_pipelines/translate_joblib.py \
     --devices "0"
 ```
 
+### Decode Stage
+```bash
+HF_DATASETS_CACHE=/home/$USER/tmp python decode.py \
+    --root_dir "/home/$USER/setu-translate" \
+    --data_files "/home/$USER/setu-translate/examples/output/wiki_en/model_out/rank_0-device_cuda:0/data-00000-of-00001.arrow" \
+    --cache_dir "/home/$USER/setu-translate/examples/cache" \
+    --decode_dir "/home/$USER/setu-translate/examples/output/wiki_en/decode" \
+    --batch_size 64 \
+    --total_procs 1 \
+    --src_lang eng_Latn \
+    --tgt_lang hin_Deva \
+```
 
+### Replace Stage
+```bash
+HF_DATASETS_CACHE=/home/$USER/tmp python replace.py \
+    --paths_data "/home/$USER/setu-translate/examples/output/wiki_en/templated/data-00000-of-00064.arrow" \
+    --cache_dir "/home/$USER/setu-translate/examples/cache" \
+    --batch_size 64 \
+    --num_procs 1 \
+    --decode_base_path "/home/$USER/setu-translate/examples/output/wiki_en/decode/*.arrow" \
+    --translated_save_path "/home/$USER/setu-translate/examples/output/wiki_en/translated"
+```
 
 

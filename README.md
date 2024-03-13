@@ -59,6 +59,9 @@ Based on your setup (local or TPU) download the appropriate JAX libraries accord
 Also download the [Flax Weights](https://ai4b-public-nlu-nlg.objectstore.e2enetworks.net/ai4b-public-nlu-nlg/sangraha/translation/it2_flax_weights.tar.gz) for IndicTrans2 and store it at ```setu-translate/stages/tpu/flax_weights/200m```.
 
 ## Usage
+
+For a full run through using a [sample subset](./examples/sample_data/sample_wiki_en_data.parquet) of Wikipedia Dataset refer to the [notebook](./examples/demo.ipynb). You can also run the stages individually using the below commands.
+
 ### Templating Stage
 ```bash
 HF_DATASETS_CACHE=/home/$USER/tmp python perform_templating.py \

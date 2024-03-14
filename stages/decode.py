@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument(
         "--format",
         type=str,
-        default="parquet",
+        default="arrow",
         required=False
     )
 
@@ -52,6 +52,13 @@ def parse_args():
     parser.add_argument(
         "--total_procs",
         type=int
+    )
+
+    parser.add_argument(
+        "--save_strs",
+        type=str2bool,
+        required=False,
+        default=True
     )
 
     parser.add_argument(
@@ -126,12 +133,13 @@ if __name__ == "__main__":
         num_proc=args.total_procs,
     )
 
-    decoded_ds = decoded_ds.map(
-        save_to_str_lvl,
-        batched=True,
-        batch_size=args.batch_size,
-        num_proc=args.total_procs,
-    )
+    if args.save_strs:
+        decoded_ds = decoded_ds.map(
+            save_to_str_lvl,
+            batched=True,
+            batch_size=args.batch_size,
+            num_proc=args.total_procs,
+        )
 
     os.makedirs(args.decode_dir, exist_ok=True)
 

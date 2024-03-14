@@ -37,6 +37,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--format",
+        type=str,
+        default="arrow",
+        required=False
+    )
+
+    parser.add_argument(
         "--num_procs",
         type=int,
         required=False,
@@ -123,7 +130,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     paths_ds = load_dataset(
-        "arrow",
+        args.format,
         data_files=glob.glob(args.paths_data),
         cache_dir=args.cache_dir,
         num_proc=args.num_procs,

@@ -35,6 +35,12 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--format",
+        type=str,
+        default="arrow",
+        required=False
+    )
+    parser.add_argument(
         "--base_save_dir",
         type=str,
         required=True
@@ -64,14 +70,12 @@ def save_to_str_lvl(batch, base_save_dir=None):
         "written": written_file,
     }
 
-
-
 if __name__ == "__main__":
 
     args = parse_args()
 
     ds = load_dataset(
-        "arrow",
+        args.format,
         data_files=glob.glob(args.data_files),
         cache_dir=args.cache_dir,
         num_proc=args.num_procs,

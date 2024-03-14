@@ -114,61 +114,13 @@ class Document:
             out = [lines[i]+lines[i+1] for i in iter_range] + [lines[-1]]
         return out
 
-    def split_using_spacy(self, text):
-        doc = self.sent_tokenization_model(text)
-        sents = [sent for sent in doc.sents]
-        return sents
-
     def split_into_sentences(self, method="regex"):
         split_methods = {
             "regex": self.split_with_delimiter,
-            "spacy": self.split_using_spacy,
         }
         sents = [self.clean_string( sent.text if not isinstance(sent, str) else sent ) for sent in split_methods[method](self.text) if len(sent)]
         sents = [sent for sent in sents if len(sent)]
         return self.remove_duplicate_string(sents)
-
-    @classmethod
-    @staticmethod
-    def get_translate_doc_schema():
-        return {
-            "doc_id": [str(None)], 
-            "source": [str(None)], 
-            "url": [str(None)], 
-            "timestamp": [str(None)], 
-            "text": [str(None)], 
-            "translated_text": [str(None)]
-        }
-
-    def get_document_attrs(self):
-
-        if not self.timestamp:
-            timestamp = str(None)        
-        elif isinstance(self.timestamp, str):
-            timestamp = self.timestamp  
-        else:
-            timestamp = self.timestamp.strftime("%m/%d/%Y, %H:%M:%S")
-         
-        return {
-            "doc_id": self.doc_id,
-            "source": self.source,
-            "url": self.url,
-            "timestamp": timestamp,
-            "text": self.text,
-            "translated_text": self.translated_text if self.translation_complete else None,
-        }
-
-    def add_placeholders(
-        self,
-        placeholder_str="{sid::<str_id>}",
-    ):
-        if self.translation_type == "chunk":
-            df = self.chunks
-        elif self.translation_type == "sentence":
-            df = self.sentences
-
-        for index, row in df.iterrows():
-            self.templated_text = self.templated_text.replace(row["text"], placeholder_str.replace("<str_id>", row["hash_id"]))
 
     @classmethod
     @staticmethod
@@ -205,23 +157,4 @@ class Document:
             "sub_strs": json.dumps(df["text"].tolist()),
             "sids": json.dumps(df["hash_id"].tolist()),
         }
-    
-    def translate(
-        self,
-        translated_lines,
-    ):
-        if self.translation_type == "chunk":
-            self.chunks["translated_text"] = translated_lines
-            df = self.chunks
-        elif self.translation_type == "sentence":
-            self.sentences["translated_text"] = translated_lines
-            df = self.sentences
-        
-        for index, row in df.iterrows():
-            self.replace_string(row["text"], row["translated_text"])
-
-        self.translation_complete = True
-        return self.translation_complete
-
-        
     

@@ -38,6 +38,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--format",
+        type=str,
+        default="arrow",
+        required=False,
+    )
+
+    parser.add_argument(
         "--binarized_dir",
         type=str,
     )
@@ -122,7 +129,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     ds = load_dataset(
-        "arrow",
+        args.format,
         data_files=glob.glob(args.data_files),
         num_proc=args.total_procs,
         cache_dir=args.cache_dir,  

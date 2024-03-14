@@ -22,6 +22,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--format",
+        type=str,
+        default="arrow",
+        required=False,
+    )
+
+    parser.add_argument(
         "--global_sent_ds_path",
         type=str,
         required=True,
@@ -67,7 +74,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     paths_ds = load_dataset(
-        "arrow",
+        args.format,
         data_files=[args.paths_data],
         cache_dir=args.cache_dir,
         num_proc=64,

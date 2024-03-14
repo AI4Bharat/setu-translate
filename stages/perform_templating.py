@@ -98,6 +98,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--format",
+        type=str,
+        default="parquet",
+        required=False
+    )
+
+    parser.add_argument(
         "--use_cache",
         type=str2bool,
         default=False,
@@ -179,7 +186,6 @@ def remove_non_terminated_chunks(
 def perform_templating(
     samples,
     add_placeholders=False, 
-    sent_tokenization_model=None,
     id_col=None,
     text_col="content",
     url_col="url",
@@ -209,11 +215,7 @@ def perform_templating(
             timestamp=samples[timestamp_col][i] if timestamp_col else None,
             source_type=source_type,
             translation_type=translation_type,
-            sent_tokenization_model=sent_tokenization_model,
         )
-
-        # if add_placeholders:
-        #     doc.add_placeholders()
 
         doc_dict = doc.get_templated_document_attrs()
 
@@ -325,24 +327,22 @@ if __name__ == "__main__":
     perform_invalid_terminal_chunk_removal = args.filter_invalid_terminal
     use_spacy = args.use_spacy
 
-    rw = load_dataset(
-        "parquet",
+    ds = load_dataset(
+        args.format,
         data_files=glob.glob(args.glob_path),
         cache_dir=args.cache_dir_for_original_data,
         num_proc=64,
         split=args.split
     )
 
-    # rw = load_dataset("parquet",data_files=["data/wiki_en/wiki_en_data.parquet"],cache_dir="data/wiki_en/cache",num_proc=64,split="train[${prev}:${i}%]")
-
     print(f"Loaded Dataset from path - {args.glob_path}")
     
     if args.sample_size:
-        rw = rw.select(range(sample_size))
+        ds = ds.select(range(sample_size))
         print(f"Sampled dataset of size - {args.sample_size}")
 
     if perform_invalid_terminal_chunk_removal:
-        rw = rw.map(
+        ds = ds.map(
             partial(
                 remove_non_terminated_chunks,
                 text_col=args.text_col
@@ -354,13 +354,10 @@ if __name__ == "__main__":
         )
         print(f"Performed `terminal punctuation check`")
 
-    sent_tokenization_model = spacy.load("en_core_web_md") if use_spacy else None
-
-    rw_templated = rw.map(
+    ds_templated = ds.map(
         partial(
             perform_templating,
             add_placeholders=args.add_placeholders,
-            sent_tokenization_model=sent_tokenization_model,
             id_col=args.id_col,
             text_col=args.text_col,
             url_col=args.url_col,
@@ -371,12 +368,12 @@ if __name__ == "__main__":
         batched=True,
         batch_size=256,
         num_proc=64,
-        remove_columns=rw.features,
+        remove_columns=ds.features,
         load_from_cache_file=args.use_cache,
     )
     print(f"Performed `templating`")
 
-    rw_templated_filtered = rw_templated.filter(
+    ds_templated_filtered = ds_templated.filter(
         lambda samples: [ True if samples["doc_id"][i] != str(None) else False for i in range(len(samples["doc_id"])) ],
         batched=True,
         batch_size=256,
@@ -394,7 +391,7 @@ if __name__ == "__main__":
             "doc": write_to_doc_lvl_csvs,
         }
 
-        rw_templated_filtered = rw_templated_filtered.map(
+        ds_templated_filtered = ds_templated_filtered.map(
             partial(
                 write_style[args.write_style],
                 base_save_path=args.base_save_path,
@@ -407,12 +404,12 @@ if __name__ == "__main__":
         )
         print(f"Written mini sentence csvs using {args.write_style} style")
 
-        csv_paths = rw_templated_filtered.remove_columns([col for col in rw_templated_filtered.features if col != "csv_path"])
+        csv_paths = ds_templated_filtered.remove_columns([col for col in ds_templated_filtered.features if col != "csv_path"])
         csv_paths_file = os.path.join(args.base_save_path, "paths.csv")
         csv_paths.to_csv(csv_paths_file, num_proc=64)
         print(f"Saved `paths.csv` to {csv_paths_file}")
 
-    rw_templated_filtered = rw_templated_filtered.map(
+    ds_templated_filtered = ds_templated_filtered.map(
             partial(
                 add_tlt_folder_path,
                 base_save_path=args.base_save_path,
@@ -426,7 +423,7 @@ if __name__ == "__main__":
 
     os.makedirs(args.save_path, exist_ok=True)
 
-    rw_templated_filtered.save_to_disk(args.save_path, num_proc=64)
+    ds_templated_filtered.save_to_disk(args.save_path, num_proc=64)
     print(f"Saved `templated` dataset to {args.save_path}")
     
 

@@ -212,8 +212,8 @@ def perform_templating(
             sent_tokenization_model=sent_tokenization_model,
         )
 
-        if add_placeholders:  
-            doc.add_placeholders()
+        # if add_placeholders:
+        #     doc.add_placeholders()
 
         doc_dict = doc.get_templated_document_attrs()
 

@@ -10,6 +10,8 @@ from document import Document
 import pickle
 import json
 import argparse
+from datasets import disable_caching
+disable_caching()
 
 def parse_args():
 
@@ -87,7 +89,8 @@ def replace_translated(samples, decode_base_path=None):
 
             if decode_base_path:
                 sid_tlt_file_path = os.path.join(decode_base_path, *sid_tlt_file_path.split("/")[-2:])
-
+                
+            
             if not os.path.exists(sid_tlt_file_path):
                 continue
 
@@ -127,11 +130,11 @@ if __name__ == "__main__":
         split="train",
     )
 
-    replace_ds = paths_ds.map(
+    replace_ds = paths_ds.select(range(4)).map(
         partial(replace_translated, decode_base_path=args.decode_base_path),
         batched=True,
-        batch_size=args.batch_size,
-        num_proc=args.num_procs,
+        batch_size=4,
+        num_proc=1,
         load_from_cache_file=False,
     )
 

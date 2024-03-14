@@ -76,7 +76,7 @@ def padding_collator(
     batch, 
     keys_to_pad=[
             ("input_ids", 1), 
-            ("attention_masks", 0),
+            ("attention_mask", 0),
         ]
     ):
 
@@ -192,7 +192,8 @@ if __name__ == "__main__":
         data_files=glob.glob(args.data_files),
         num_proc=args.total_procs,
         cache_dir=args.cache_dir,
-        split="train",
+        # split="train",
+        split="train"
     )
 
     batch_status = Parallel(

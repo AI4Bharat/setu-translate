@@ -1,11 +1,11 @@
 
 
 
-HF_DATASETS_CACHE=/home/llm/tmp python perform_templating.py \
-    --glob_path "/home/llm/translate/data/wiki_en/wiki_en_data.parquet" \
-    --cache_dir_for_original_data "/home/llm/translate/data/wiki_en/cache" \
-    --base_save_path "/home/llm/translate/output/wiki_en/doc_csvs" \
-    --save_path "/home/llm/translate/output/wiki_en/templated" \
+HF_DATASETS_CACHE=/home/$USER/tmp python perform_templating.py \
+    --glob_path "/home/$USER/setu-translate/examples/sample_data/wiki_en_data.parquet" \
+    --cache_dir_for_original_data "/home/$USER/setu-translate/examples/cache" \
+    --base_save_path "/home/$USER/setu-translate/examples/output/wiki_en/doc_csvs" \
+    --save_path "/home/$USER/setu-translate/examples/output/wiki_en/templated" \
     --text_col body \
     --url_col url \
     --timestamp_col timestamp \
@@ -14,29 +14,29 @@ HF_DATASETS_CACHE=/home/llm/tmp python perform_templating.py \
     --use_cache False \
     --split "train[:5%]"
 
-HF_DATASETS_CACHE=/home/llm/tmp python create_global_ds.py \
-    --paths_data "/home/llm/translate/output/wiki_en/templated/*.arrow" \
-    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
-    --global_sent_ds_path "/home/llm/translate/output/wiki_en/sentences"
+HF_DATASETS_CACHE=/home/$USER/tmp python create_global_ds.py \
+    --paths_data "/home/$USER/setu-translate/examples/output/wiki_en/templated/*.arrow" \
+    --cache_dir "/home/$USER/setu-translate/examples/cache" \
+    --global_sent_ds_path "/home/$USER/setu-translate/examples/output/wiki_en/sentences"
 
-HF_DATASETS_CACHE=/home/llm/tmp python binarize.py \
-    --root_dir "/home/llm/translate" \
-    --data_files "/home/llm/translate/output/wiki_en/sentences/*.arrow" \
-    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
-    --binarized_dir "/home/llm/translate/output/wiki_en/binarized_sentences" \
-    --joblib_temp_folder "/home/llm/translate/tmp" \
+HF_DATASETS_CACHE=/home/$USER/tmp python binarize.py \
+    --root_dir "/home/$USER/setu-translate" \
+    --data_files "/home/$USER/setu-translate/examples/output/wiki_en/sentences/*.arrow" \
+    --cache_dir "/home/$USER/setu-translate/examples/cache" \
+    --binarized_dir "/home/$USER/setu-translate/examples/output/wiki_en/binarized_sentences" \
     --batch_size 2048 \
-    --total_procs 64 \
-    --run_joblib False \
+    --total_procs 1 \
+    --padding max_length \
     --src_lang eng_Latn \
-    --tgt_lang hin_Deva
+    --tgt_lang hin_Deva \
+    --return_format pt
 
-HF_DATASETS_CACHE=/home/llm/tmp python tlt_pipelines/translate_joblib.py \
-    --root_dir "/home/llm/translate" \
-    --data_files "/home/llm/translate/output/wiki_en/binarized_sentences/*.arrow" \
-    --cache_dir "/home/llm/translate/data/wiki_en/cache" \
-    --base_save_dir "/home/llm/translate/output/wiki_en/model_out" \
-    --joblib_temp_folder "/home/llm/translate/tmp" \
+HF_DATASETS_CACHE=/home/$USER/tmp python tlt_pipelines/translate_joblib.py \
+    --root_dir "/home/$USER/setu-translate" \
+    --data_files "/home/$USER/setu-translate/examples/output/wiki_en/binarized_sentences/*.arrow" \
+    --cache_dir "/home/$USER/setu-translate/examples/cache" \
+    --base_save_dir "/home/$USER/setu-translate/examples/output/wiki_en/model_out" \
+    --joblib_temp_folder "/home/$USER/setu-translate/tmp" \
     --batch_size 512 \
-    --total_procs 64 \
-    --devices "0,1"
+    --total_procs 1 \
+    --devices "0"

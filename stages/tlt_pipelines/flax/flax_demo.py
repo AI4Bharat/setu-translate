@@ -31,7 +31,7 @@ ip = IndicProcessor(inference=True)
 # )
 
 model = FlaxIndicTransForConditionalGeneration.from_pretrained(
-    "/data-3/priyam/tpu-translation/flax_weights/200m",
+    "flax_weights/200m",
     local_files_only=True,
     dtype=jnp.bfloat16,
 )

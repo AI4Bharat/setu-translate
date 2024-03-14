@@ -99,7 +99,6 @@ run_binarize() {
         --padding $padding \
         --src_lang $src_lang \
         --tgt_lang $tgt_lang \
-        --return_format $return_format
 
     # Check exit status of the first command
     if [ $? -ne 0 ]; then

@@ -1,7 +1,9 @@
 import os
+import sys
 import torch
 from torch.utils.data import DataLoader
 import jax
+jax.distributed.initialize()
 import jax.numpy as jnp
 import numpy as np
 
@@ -27,25 +29,25 @@ from functools import partial
 import tqdm
 import argparse
 
+import gcsfs
+
 from jax_smi import initialise_tracking
 initialise_tracking()
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def parse_args():
 
     parser = argparse.ArgumentParser(description="Perform distributed inference")
 
     parser.add_argument(
-        "--root_dir",
-        type=str,
-    )
-
-    parser.add_argument(
         "--data_files",
-        type=str,
-    )
-
-    parser.add_argument(
-        "--cache_dir",
         type=str,
     )
 
@@ -65,9 +67,39 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--accelerator_type",
+        type=str,
+        choices=["gpu", "tpu"],
+        default="gpu",
+        required=False
+    )
+
+    parser.add_argument(
         "--devices",
         type=str,
-        required=True,
+        default=None,
+        required=False,
+    )
+
+    parser.add_argument(
+        "--on_gcp",
+        type=str2bool,
+        default=False,
+        required=False
+    )
+
+    parser.add_argument(
+        "--cache_dir",
+        type=str,
+        required=False,
+        default=None
+    )
+
+    parser.add_argument(
+        "--gcp_project",
+        type=str,
+        default=None,
+        required=False
     )
 
     args = parser.parse_args()
@@ -94,18 +126,15 @@ def padding_collator(
         len_list = list(map(lambda x: len(x), batch_out[key]))
 
         padding_length = max(len_list)
-        # padding_length = 256
         array_list = []
         for i, x in enumerate(batch_out[key]):
 
             if len(x) < padding_length:
-                # Use np.array for creating arrays and np.concatenate for combining them
                 padded_array = np.concatenate([np.full((padding_length - len(x)), value_to_pad_with), np.array(x)])
                 array_list.append(padded_array)
             else:
                 array_list.append(np.array(x))
 
-        # Use np.stack to stack arrays along a new axis
         batch_out[key] = np.stack(array_list)
 
     return batch_out
@@ -114,28 +143,40 @@ if __name__ == "__main__":
 
     args = parse_args()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.devices
-    device_ids = [ int(idx.strip()) for idx in args.devices.split(",") if idx and len(idx.strip()) ]
-    total_device_count = len(device_ids)
+    print(f"Translate Job called using following command-line command: {sys.argc[0]}")
+    print("Parsed arguments are: ")
+    print(args)
 
-    ds = load_dataset(
-        "arrow",
-        data_files=glob.glob(args.data_files),
-        num_proc=args.total_procs,
-        cache_dir=args.cache_dir,
-        split="train",
-    )
+    if args.accelerator_type == "gpu":
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.devices
+        device_ids = [ int(idx.strip()) for idx in args.devices.split(",") if idx and len(idx.strip()) ]
+        total_device_count = len(device_ids)
+
+        ds = load_dataset(
+            "arrow",
+            data_files=glob.glob(args.data_files),
+            num_proc=args.total_procs,
+            cache_dir=args.cache_dir,
+            split="train",
+        )
+
+    if args.on_gcp:
+        storage_options={
+            "project": args.gcp_project,
+        }
+        total_device_count = jax.device_count()
+        ds = load_from_disk(args.data_files, storage_options=storage_options)
 
     data_loader = torch.utils.data.DataLoader(
         ds,
         batch_size=args.batch_size,
         drop_last=True,
-        num_workers=8,
+        num_workers=32,
         collate_fn=padding_collator,
     )
 
     model = FlaxIndicTransForConditionalGeneration.from_pretrained(
-        "setu-translate/stages/tpu/flax_weights/200m",
+        os.path.join(os.environ["SETU_TRANSLATE_ROOT"], "stages/tpu/flax_weights/200m"),
         local_files_only=True,
         dtype=jnp.bfloat16,
     )
@@ -194,9 +235,20 @@ if __name__ == "__main__":
             ],
         )
 
-    save_dir = os.path.join(args.base_save_dir, f"devices_{args.devices.replace(',', '_')}")
-    os.makedirs(save_dir, exist_ok=True)
+    if not args.on_gcp:
+        save_dir = os.path.join(args.base_save_dir, f"devices_{args.devices.replace(',', '_')}")
+        os.makedirs(save_dir, exist_ok=True)
+    
     run_ds.save_to_disk(
         save_dir,
         num_proc=args.total_procs,
+        storage_options=None if not args.on_gcp else storage_options
     )
+
+
+'''
+gcloud compute tpus tpu-vm ssh tlt-flax-build \
+  --zone=us-central2-b \
+  --worker=all \
+  --command="gsutil cp gs://translation-ai4b/setu-translate/stages/tpu/translate_tpu_pmap.py /opt/setu-translate/stages/tpu/"
+'''

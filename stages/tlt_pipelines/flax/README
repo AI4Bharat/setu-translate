@@ -1,0 +1,15 @@
+Refer to: https://www.googlecloudcommunity.com/gc/Developer-Tools/TPU-POD-no-initiation/m-p/597179
+
+# Handle Multi-Host process:
+https://jax.readthedocs.io/en/latest/multi_process.html
+https://github.com/google/jax/discussions/16789#discussioncomment-6615502
+https://jax.readthedocs.io/en/latest/_autosummary/jax.make_array_from_single_device_arrays.html
+https://jax.readthedocs.io/en/latest/_autosummary/jax.experimental.multihost_utils.process_allgather.html#jax.experimental.multihost_utils.process_allgather
+
+
+```bash
+gcloud compute tpus tpu-vm ssh tlt-flax-build \
+    --zone=us-central2-b \
+    --worker=all \
+    --command="SETU_TRANSLATE_ROOT=/root/setu-translate sudo python3 /root/setu-translate/stages/tpu/translate_tpu_pod.py --data_files gs://translation-ai4b/data_to_translate/wikimedia/binarized/hin_Deva/data-00000-of-00192.arrow --base_save_dir gs://translation-ai4b/test-out/wikimedia/hin_Deva --batch_size 2048 --total_procs 196 --accelerator_type "tpu" --format "arrow" --keep_in_memory "True" --on_gcp True --gcp_project sangraha-396106"
+```

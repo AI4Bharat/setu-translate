@@ -23,13 +23,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Perform decoding")
 
     parser.add_argument(
-        "--root_dir",
+        "--data_files",
         type=str,
     )
 
     parser.add_argument(
-        "--data_files",
+        "--format",
         type=str,
+        default="parquet",
+        required=False
     )
 
     parser.add_argument(
@@ -99,13 +101,12 @@ def save_to_str_lvl(batch):
         "written": written_file
     }
 
-
 if __name__ == "__main__":
 
     args = parse_args()
 
     ds = load_dataset(
-        "arrow",
+        args.format,
         data_files=glob.glob(args.data_files),
         num_proc=args.total_procs,
         cache_dir=args.cache_dir,  

@@ -104,6 +104,13 @@ gcloud compute tpus tpu-vm create tlt-flax-build \
     --data-disk source=projects/sangraha-396106/zones/us-central2-b/disks/tlt-flax-disk,mode=read-write
 
 gcloud compute tpus tpu-vm create tlt-flax-build \
+    --zone=us-central2-b \
+    --accelerator-type=v4-64 \
+    --version=tpu-ubuntu2204-base \
+    --metadata=startup-script-url="gs://translation-ai4b/setu-translate/stages/tpu/setup_environment.sh" \
+    --data-disk source=projects/sangraha-396106/zones/us-central2-b/disks/tlt-flax-disk,mode=read-only
+
+gcloud compute tpus tpu-vm create tlt-flax-build \
     --zone=europe-west4-a \
     --accelerator-type=v3-8 \
     --version=tpu-ubuntu2204-base \
@@ -121,6 +128,13 @@ gcloud alpha compute tpus tpu-vm attach-disk tlt-flax-build \
     --zone=europe-west4-a \
     --disk=tlt-flax-disk \
     --mode=read-write
+
+
+gcloud compute tpus tpu-vm ssh tlt-flax-build \
+    --zone=us-central2-b \
+    --worker=all \
+    --command="SETU_TRANSLATE_ROOT=/opt/setu-translate sudo python3 /opt/setu-translate/stages/tpu/translate_tpu_pmap.py --data_files gs://translation-ai4b/data_to_translate/wikimedia/binarized/hin_Deva/data-00000-of-00192.arrow --base_save_dir gs://translation-ai4b/test-out/wikimedia/hin_Deva --batch_size 2048 --total_procs 196 --accelerator_type "tpu" --on_gcp True --gcp_project sangraha-396106"
+
 
 SETU_TRANSLATE_ROOT="/data/priyam/translation" bash /data/priyam/translation/setu-translate/scripts/run_binarize_and_translate.sh \
     --map_file "/data/priyam/translation/data/wiki-en/shards/mapping/device_map_0" \
@@ -187,14 +201,12 @@ HF_DATASETS_CACHE=/mnt/disks/persist/tmp python setu-translate/stages/tpu/transl
 
 
 HF_DATASETS_CACHE=/data/priyam/tmp python /data/priyam/translation/setu-translate/stages/decode.py \
-    --root_dir "$PWD" \
-    --data_files "/data/priyam/translation/outputs/wiki-en/shards_1627/tpu-out/full/hin_Deva/model_out/devices_0_1_2_3_6_7/*.arrow" \
+    --data_files "/data/priyam/translation/data/wikimedia/*/*.parquet" \
+    --format "parquet" \
     --cache_dir /data/priyam/tmp \
-    --decode_dir "/data/priyam/translation/outputs/wiki-en/shards_1627/tpu-out/full/hin_Deva/decoded" \
-    --joblib_temp_folder /data/priyam/tmp \
+    --decode_dir "/data/priyam/translation/data/wikimedia/hin_Deva/decoded" \
     --batch_size 1024 \
     --total_procs 64 \
-    --run_joblib False \
     --src_lang eng_Latn \
     --tgt_lang hin_Deva
 

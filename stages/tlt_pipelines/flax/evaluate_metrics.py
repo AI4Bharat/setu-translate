@@ -36,10 +36,15 @@ initialise_tracking()
 
 def parse_args():
 
-    parser = argparse.ArgumentParser(description="Perform distributed inference")
+    parser = argparse.ArgumentParser(description="Evaluate Metrics")
 
     parser.add_argument(
         "--base_save_dir",
+        type=str,
+    )
+
+    parser.add_argument(
+        "--setu_translate_root",
         type=str,
     )
 
@@ -176,7 +181,7 @@ if __name__ == "__main__":
     print("Loaded the datasets....")
 
     model = FlaxIndicTransForConditionalGeneration.from_pretrained(
-        "/data/priyam/translation/setu-translate/stages/tpu/flax_weights/200m",
+        os.path.join(args.setu_translate_root, "stages/tpu/flax_weights/200m"),
         local_files_only=True,
         dtype=jnp.bfloat16,
     )

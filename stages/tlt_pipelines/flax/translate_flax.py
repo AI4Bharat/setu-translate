@@ -384,7 +384,7 @@ if __name__ == "__main__":
     )
 
     model = FlaxIndicTransForConditionalGeneration.from_pretrained(
-        os.path.join(args.setu_translate_root, f"stages/tpu/flax_weights/{args.direction}/200m"),
+        os.path.join(args.setu_translate_root, f"stages/tlt_pipelines/flax/flax_weights/{args.direction}/200m"),
         local_files_only=True,
         dtype=jnp.bfloat16,
     )

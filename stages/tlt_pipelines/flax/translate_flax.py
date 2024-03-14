@@ -260,7 +260,7 @@ def save_parquets(
     process_rank, schema,
 ):
     
-    print(f"Batch size inside map: {len(idx)}")
+    # print(f"Batch size inside map: {len(idx)}")
 
     batch_fname = sha256(f"{idx}".encode('utf-8')).hexdigest()
 

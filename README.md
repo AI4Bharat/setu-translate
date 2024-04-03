@@ -56,7 +56,7 @@ pip install --editable ./
 Based on your setup (local or TPU) download the appropriate JAX libraries accordingly from [JAX Installation](https://github.com/google/jax#installation).
 
 
-Also download the [Flax Weights]([https://objectstore.e2enetworks.net/ai4b-public-nlu-nlg/sangraha/translation/it2_flax_weights.tar.gz](https://objectstore.e2enetworks.net/ai4b-public-nlu-nlg/sangraha/translation/it2_flax_weights.tar.gz)) for IndicTrans2 and store it at ```setu-translate/stages/tlt_pipelines/flax/flax_weights/200m```.
+Also download the [Flax Weights](https://objectstore.e2enetworks.net/ai4b-public-nlu-nlg/sangraha/translation/it2_flax_weights.tar.gz) for IndicTrans2 and store it at ```setu-translate/stages/tlt_pipelines/flax/flax_weights/200m```.
 
 ## Usage
 
